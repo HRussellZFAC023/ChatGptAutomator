@@ -22,11 +22,8 @@
 
     // Configuration
     const CONFIG = {
-        UI_POSITION: 'top-right',
-        AUTO_SCROLL: true,
         DEBUG_MODE: true,
-        RESPONSE_TIMEOUT: 30000,
-        POLLING_INTERVAL: 500,
+        RESPONSE_TIMEOUT: 300000,
         MIN_WIDTH: 300,
         MIN_HEIGHT: 200,
         MAX_WIDTH: 600,
