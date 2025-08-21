@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ChatGPT Automation Pro
 // @namespace    http://tampermonkey.net/
-// @version      1.4
+// @version      1.5
 // @description  Advanced ChatGPT automation with dynamic templating
 // @author       Henry Russell
 // @match        https://chatgpt.com/*
@@ -944,8 +944,7 @@
                 min-height: auto !important;
             }
             #chatgpt-automation-ui.minimized .automation-content {
-                overflow-y: auto; 
-                max-height: 300px;
+                max-height: 250px;
             }
             #chatgpt-automation-ui.minimized .progress-container,
             #chatgpt-automation-ui.minimized .automation-form { 
@@ -953,7 +952,9 @@
             }
             #chatgpt-automation-ui.minimized .automation-log { 
                 display: block !important;
-                max-height: 300px;
+            }
+            #chatgpt-automation-ui.minimized .log-content {
+                max-height: 200px;
                 overflow-y: auto;
             }
             #chatgpt-automation-ui.minimized .automation-header {
@@ -1021,7 +1022,6 @@
             }
             
             #chatgpt-automation-ui .automation-content {
-                overflow-y: auto;
                 max-height: calc(100% - 60px);
             }
             
@@ -1400,7 +1400,6 @@
             
             #chatgpt-automation-ui .automation-log {
                 border-top: 1px solid var(--border-light, rgba(0,0,0,0.06));
-                overflow-y: auto;
             }
             
             #chatgpt-automation-ui.dark-mode .automation-log {
