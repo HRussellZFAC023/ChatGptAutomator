@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ChatGPT Automation Pro
 // @namespace    http://tampermonkey.net/
-// @version      1.1
+// @version      1.4
 // @description  Advanced ChatGPT automation with dynamic templating
 // @author       Henry Russell
 // @match        https://chatgpt.com/*
@@ -189,19 +189,48 @@
                 log(`Custom code context: item=${item ? JSON.stringify(item).slice(0,100) : 'null'}, index=${index}, total=${total}`);
             }
 
-            const fn = new Function('response', 'log', 'console', 'item', 'index', 'total', 'http', code);
-            await Promise.resolve(fn(
-                responseText,
-                (msg, type = 'info') => log(msg, type),
-                console,
-                item,
-                index,
-                total,
-                http
-            ));
+            // Create and execute the user function, properly awaiting any returned promise
+            // Handle both regular code and async IIFE patterns
+            let result;
+            
+            // Check if the code is wrapped in an async IIFE pattern
+            const asyncIIFEPattern = /^\s*\(\s*async\s*\(\s*\)\s*=>\s*\{[\s\S]*\}\s*\)\s*\(\s*\)\s*;?\s*$/;
+            const isAsyncIIFE = asyncIIFEPattern.test(code.trim());
+            
+            if (isAsyncIIFE) {
+                // For async IIFE, execute directly and the result will be a Promise
+                log('Detected async IIFE pattern, executing with proper await...');
+                const fn = new Function('response', 'log', 'console', 'item', 'index', 'total', 'http', `return ${code}`);
+                result = fn(
+                    responseText,
+                    (msg, type = 'info') => log(msg, type),
+                    console,
+                    item,
+                    index,
+                    total,
+                    http
+                );
+            } else {
+                // For regular code, wrap in function as before
+                const fn = new Function('response', 'log', 'console', 'item', 'index', 'total', 'http', code);
+                result = fn(
+                    responseText,
+                    (msg, type = 'info') => log(msg, type),
+                    console,
+                    item,
+                    index,
+                    total,
+                    http
+                );
+            }
+            
+            // Properly await the result whether it's a promise or not
+            await Promise.resolve(result);
             log('Custom code executed successfully');
         } catch (error) {
             log(`Custom code execution error: ${error.message}`, 'error');
+            // Re-throw the error so the calling code can handle retries
+            throw error;
         }
     };
 
@@ -309,20 +338,43 @@
     // Function to start a new chat
     const startNewChat = async () => {
         try {
-            // Look for the home button using the provided selector
-            const homeButton = document.querySelector('a[aria-label="Home"][href="/"]');
-            if (homeButton) {
-                log('Starting new chat...');
-                homeButton.click();
-                await sleep(1000); // Wait for navigation
-                return true;
-            } else {
-                log('Home button not found, trying alternative method', 'warning');
-                // Try alternative approach by navigating to home
-                window.location.href = '/';
-                await sleep(2000);
+            log('Starting new chat...');
+            
+            // Method 1: Try the "New chat" button (language independent, uses data-testid)
+            const newChatButton = document.querySelector('a[data-testid="create-new-chat-button"]');
+            if (newChatButton) {
+                log('Using new chat button...');
+                newChatButton.click();
+                await sleep(1000);
                 return true;
             }
+                        
+            const homeLink = document.querySelector('a[href="/"]');
+            if (homeLink && homeLink.textContent.trim() !== '') {
+                log('Using home link...');
+                homeLink.click();
+                await sleep(1000);
+                return true;
+            }
+            
+            log('Using programmatic navigation...');
+            const currentUrl = window.location.href;
+            const baseUrl = window.location.origin;
+            
+            // Only navigate if we're not already on the home page
+            if (currentUrl !== baseUrl && currentUrl !== baseUrl + '/') {
+                // Use history.pushState to avoid full page reload
+                window.history.pushState({}, '', '/');
+                
+                // Trigger a popstate event to simulate navigation
+                window.dispatchEvent(new PopStateEvent('popstate'));
+                await sleep(1500);
+                return true;
+            }
+            
+            log('Already on home page or all methods failed', 'warning');
+            return false;
+            
         } catch (error) {
             log(`Error starting new chat: ${error.message}`, 'error');
             return false;
@@ -900,7 +952,9 @@
                 display: none; 
             }
             #chatgpt-automation-ui.minimized .automation-log { 
-                display: block !important; 
+                display: block !important;
+                max-height: 300px;
+                overflow-y: auto;
             }
             #chatgpt-automation-ui.minimized .automation-header {
                 position: sticky;
