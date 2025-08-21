@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ChatGPT Automation Pro
 // @namespace    http://tampermonkey.net/
-// @version      1.0
+// @version      1.1
 // @description  Advanced ChatGPT automation with dynamic templating
 // @author       Henry Russell
 // @match        https://chatgpt.com/*
@@ -23,7 +23,7 @@
     // Configuration
     const CONFIG = {
         DEBUG_MODE: true,
-        RESPONSE_TIMEOUT: 300000,
+        RESPONSE_TIMEOUT: 3000000, // 5 minutes
         MIN_WIDTH: 300,
         MIN_HEIGHT: 200,
         MAX_WIDTH: 600,
@@ -36,12 +36,17 @@
     let isLooping = false;
     let currentBatchIndex = 0;
     let dynamicElements = [];
+    let failedElements = []; // Queue for failed items
     let lastResponseElement = null;
     let responseObserver = null;
     let isMinimized = false;
     let isDarkMode = false;
     let uiVisible = CONFIG.DEFAULT_VISIBLE;
     let headerObserverStarted = false;
+    let batchWaitTime = 2000; // Default wait time between batch items
+    let autoRemoveProcessed = true; // Whether to remove processed items from textbox
+    let autoScrollLogs = true; // Whether to auto-scroll logs
+    let newChatPerItem = false; // Whether to start new chat for each item
 
     // UI Elements
     let mainContainer = null;
@@ -68,7 +73,11 @@
             logEntry.className = `log-entry log-${type}`;
             logEntry.textContent = logMessage;
             logContainer.appendChild(logEntry);
-            logContainer.scrollTop = logContainer.scrollHeight;
+            
+            // Auto-scroll logs if enabled
+            if (autoScrollLogs) {
+                logContainer.scrollTop = logContainer.scrollHeight;
+            }
 
             // Keep only last 50 log entries
             while (logContainer.children.length > 50) {
@@ -150,6 +159,11 @@
                         log('Context note: multiple dynamic elements detected but Template mode is off; no auto-selection applied', 'warning');
                     }
                 } catch { /* ignore fallback errors */ }
+            }
+
+            // Debug logging to help troubleshoot
+            if (CONFIG.DEBUG_MODE) {
+                log(`Custom code context: item=${item ? JSON.stringify(item).slice(0,100) : 'null'}, index=${index}, total=${total}`);
             }
 
             const fn = new Function('response', 'log', 'console', 'item', 'index', 'total', 'http', code);
@@ -254,35 +268,45 @@
         return null;
     };
 
-    const waitForElement = (selector, timeout = 5000) => {
-        return new Promise((resolve, reject) => {
-            const element = document.querySelector(selector);
-            if (element) {
-                resolve(element);
-                return;
-            }
 
-            const observer = new MutationObserver((mutations, obs) => {
-                const element = document.querySelector(selector);
-                if (element) {
-                    obs.disconnect();
-                    resolve(element);
-                }
-            });
-
-            observer.observe(document.body, {
-                childList: true,
-                subtree: true
-            });
-
-            setTimeout(() => {
-                observer.disconnect();
-                reject(new Error(`Element ${selector} not found within timeout`));
-            }, timeout);
-        });
-    };
 
     const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+    // Function to start a new chat
+    const startNewChat = async () => {
+        try {
+            // Look for the home button using the provided selector
+            const homeButton = document.querySelector('a[aria-label="Home"][href="/"]');
+            if (homeButton) {
+                log('Starting new chat...');
+                homeButton.click();
+                await sleep(1000); // Wait for navigation
+                return true;
+            } else {
+                log('Home button not found, trying alternative method', 'warning');
+                // Try alternative approach by navigating to home
+                window.location.href = '/';
+                await sleep(2000);
+                return true;
+            }
+        } catch (error) {
+            log(`Error starting new chat: ${error.message}`, 'error');
+            return false;
+        }
+    };
+
+    // Function to update dynamic elements in real-time
+    const updateDynamicElementsDisplay = (remainingElements) => {
+        if (dynamicElementsInput && autoRemoveProcessed) {
+            try {
+                const newValue = JSON.stringify(remainingElements, null, 2);
+                dynamicElementsInput.value = newValue;
+                log(`Updated queue: ${remainingElements.length} items remaining`);
+            } catch (error) {
+                log(`Error updating display: ${error.message}`, 'warning');
+            }
+        }
+    };
 
     // ChatGPT interaction functions
     const getChatInput = () => {
@@ -437,6 +461,7 @@
         if (!isLooping) {
             isProcessing = true;
             currentBatchIndex = 0;
+            failedElements = []; // Reset failed queue
         }
 
         updateStatus('processing');
@@ -445,78 +470,134 @@
             let messagesToProcess = [];
 
             if (isTemplate && dynamicElements.length > 0) {
+                // Add any failed elements to the front of the queue
+                const allElements = [...failedElements, ...dynamicElements.slice(currentBatchIndex)];
+                
+                // Debug: Log the elements being processed
+                if (CONFIG.DEBUG_MODE) {
+                    log(`Processing ${allElements.length} elements. First element: ${JSON.stringify(allElements[0])}`);
+                }
+                
                 // Process template with dynamic elements
-                messagesToProcess = dynamicElements.map((element, index) => ({
+                messagesToProcess = allElements.map((element, index) => ({
                     message: processDynamicTemplate(message, {
                         item: element,
                         index: index + 1,
-                        total: dynamicElements.length
+                        total: allElements.length
                     }),
                     customCode,
                     elementData: element,
-                    index: index + 1
+                    index: index + 1,
+                    originalIndex: dynamicElements.indexOf(element)
                 }));
+                
+                // Clear failed elements since we're processing them
+                failedElements = [];
             } else {
                 messagesToProcess = [{ message, customCode }];
             }
 
-            for (let i = currentBatchIndex; i < messagesToProcess.length; i++) {
-                const { message: processedMessage, customCode: code, elementData, index } = messagesToProcess[i];
-                currentBatchIndex = i;
-
+            for (let i = 0; i < messagesToProcess.length; i++) {
+                const { message: processedMessage, customCode: code, elementData, index, originalIndex } = messagesToProcess[i];
+                
                 updateProgress(i + 1, messagesToProcess.length);
 
                 if (isTemplate) {
                     log(`Processing item ${index}/${messagesToProcess.length}: ${JSON.stringify(elementData)}`);
                 }
 
-                log(`Starting message processing...`);
-
-                // Type the message
-                await typeMessage(processedMessage);
-                await sleep(500);
-
-                // Send the message
-                await sendMessage();
-                updateStatus('waiting');
-
-                // Wait for response
-                log('Waiting for ChatGPT response...');
-                const responseElement = await waitForResponse();
-                const responseText = extractResponseText(responseElement);
-
-                log('Response received');
-                console.log('ChatGPT Response:', responseText);
-
-                // Execute custom code if provided
-                if (code && code.trim() !== '') {
-                    if (isTemplate) {
-                        try { log(`Custom code context -> index: ${index ?? 'null'}/${messagesToProcess.length}, item: ${elementData ? JSON.stringify(elementData).slice(0,200) : 'null'}`); } catch { /* no-op */ }
+                try {
+                    // Start new chat if option is enabled and not the first item
+                    if (newChatPerItem && i > 0) {
+                        const success = await startNewChat();
+                        if (!success) {
+                            log('Failed to start new chat, continuing in current chat', 'warning');
+                        }
+                        await sleep(1000); // Additional wait after new chat
                     }
-                    log('Executing custom code...');
-                    await executeCustomCode(code, responseText, {
-                        elementData,
-                        index,
-                        total: messagesToProcess.length
-                    });
+
+                    log(`Starting message processing...`);
+
+                    // Type the message
+                    await typeMessage(processedMessage);
+                    await sleep(500);
+
+                    // Send the message
+                    await sendMessage();
+                    updateStatus('waiting');
+
+                    // Wait for response
+                    log('Waiting for ChatGPT response...');
+                    const responseElement = await waitForResponse();
+                    const responseText = extractResponseText(responseElement);
+
+                    log('Response received');
+                    console.log('ChatGPT Response:', responseText);
+
+                    // Execute custom code if provided
+                    if (code && code.trim() !== '') {
+                        if (isTemplate) {
+                            try { log(`Custom code context -> index: ${index ?? 'null'}/${messagesToProcess.length}, item: ${elementData ? JSON.stringify(elementData).slice(0,200) : 'null'}`); } catch { /* no-op */ }
+                        }
+                        log('Executing custom code...');
+                        await executeCustomCode(code, responseText, {
+                            elementData,
+                            index,
+                            total: messagesToProcess.length
+                        });
+                    }
+
+                    // Item processed successfully - remove from original array if auto-remove is enabled
+                    if (isTemplate && autoRemoveProcessed && originalIndex !== undefined && originalIndex >= 0) {
+                        dynamicElements.splice(originalIndex, 1);
+                        // Update indices for remaining items
+                        for (let j = i + 1; j < messagesToProcess.length; j++) {
+                            if (messagesToProcess[j].originalIndex > originalIndex) {
+                                messagesToProcess[j].originalIndex--;
+                            }
+                        }
+                        updateDynamicElementsDisplay(dynamicElements);
+                    }
+
+                    log(`Item ${index} processed successfully`);
+
+                } catch (itemError) {
+                    log(`Error processing item ${index}: ${itemError.message}`, 'error');
+                    
+                    // Add failed item to retry queue (front of queue for next batch)
+                    if (isTemplate && elementData) {
+                        failedElements.unshift(elementData);
+                        log(`Item ${index} added to retry queue`, 'warning');
+                    }
+                    
+                    // Continue with next item instead of stopping entire batch
+                    log('Continuing with next item...', 'info');
                 }
 
-                // Add delay between batch items
+                // Add delay between batch items (user configurable)
                 if (i < messagesToProcess.length - 1) {
-                    log('Waiting before next item...');
-                    await sleep(2000);
+                    log(`Waiting ${batchWaitTime}ms before next item...`);
+                    await sleep(batchWaitTime);
                 }
 
                 // Check if loop should continue
                 if (!isLooping) break;
             }
 
+            // Show retry queue status
+            if (failedElements.length > 0) {
+                log(`Batch completed with ${failedElements.length} failed items in retry queue`, 'warning');
+                log('Failed items will be retried in next batch run', 'info');
+            } else {
+                log('All items processed successfully');
+            }
+
             updateStatus('complete');
-            log('Message processing completed successfully');
+            log('Message processing completed');
             updateProgress(0, 0); // Reset progress
 
         } catch (error) {
-            log(`Error: ${error.message}`, 'error');
+            log(`Batch error: ${error.message}`, 'error');
             updateStatus('error');
             updateProgress(0, 0);
         } finally {
@@ -536,6 +617,24 @@
         updateStatus('idle');
         updateProgress(0, 0);
         log('Batch processing stopped');
+    };
+
+    // Update visibility of failed items buttons
+    const updateFailedButtonsVisibility = () => {
+        const retryBtn = document.getElementById('retry-failed-btn');
+        const clearBtn = document.getElementById('clear-failed-btn');
+        const failedCountSpan = document.getElementById('failed-count');
+        
+        if (retryBtn && clearBtn && failedCountSpan) {
+            if (failedElements.length > 0) {
+                retryBtn.style.display = 'inline-block';
+                clearBtn.style.display = 'inline-block';
+                failedCountSpan.textContent = failedElements.length;
+            } else {
+                retryBtn.style.display = 'none';
+                clearBtn.style.display = 'none';
+            }
+        }
     };
 
     // Update progress bar
@@ -625,12 +724,42 @@
                         </div>
                         
                         <div class="batch-controls">
-                            <label class="checkbox-label">
-                                <input type="checkbox" id="loop-checkbox">
-                                <span class="checkmark"></span>
-                                Process all items in batch
-                            </label>
-                            <button id="stop-batch-btn" class="btn btn-danger" style="display: none;">Stop Batch</button>
+                            <div class="batch-settings">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="loop-checkbox">
+                                    <span class="checkmark"></span>
+                                    Process all items in batch
+                                </label>
+                                
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="auto-remove-checkbox" checked>
+                                    <span class="checkmark"></span>
+                                    Remove processed items from queue
+                                </label>
+                                
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="new-chat-checkbox">
+                                    <span class="checkmark"></span>
+                                    Start new chat for each item
+                                </label>
+                                
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="auto-scroll-checkbox" checked>
+                                    <span class="checkmark"></span>
+                                    Auto-scroll logs
+                                </label>
+                                
+                                <div class="wait-time-control">
+                                    <label for="wait-time-input">Wait between items (ms):</label>
+                                    <input type="number" id="wait-time-input" min="100" max="30000" value="2000" step="100">
+                                </div>
+                            </div>
+                            
+                            <div class="batch-actions">
+                                <button id="stop-batch-btn" class="btn btn-danger" style="display: none;">Stop Batch</button>
+                                <button id="retry-failed-btn" class="btn btn-warning" style="display: none;">Retry Failed (<span id="failed-count">0</span>)</button>
+                                <button id="clear-failed-btn" class="btn btn-secondary" style="display: none;">Clear Failed</button>
+                            </div>
                         </div>
                     </div>
                     
@@ -667,7 +796,10 @@
                 <div class="automation-log" id="log-container" style="display: none;">
                     <div class="log-header">
                         <span>Activity Log</span>
-                        <button class="tool-btn" id="clear-log-btn" title="Clear Log">🗑️</button>
+                        <div class="log-header-controls">
+                            <button class="tool-btn" id="toggle-auto-scroll-btn" title="Toggle Auto-scroll">📜</button>
+                            <button class="tool-btn" id="clear-log-btn" title="Clear Log">🗑️</button>
+                        </div>
                     </div>
                     <div class="log-content"></div>
                 </div>
@@ -937,13 +1069,64 @@
                 padding: 12px;
                 background: var(--surface-secondary, #f8fafc);
                 border-radius: 6px;
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
             }
             
             #chatgpt-automation-ui.dark-mode .batch-controls {
                 background: var(--surface-secondary, #1e1e20);
+            }
+            
+            #chatgpt-automation-ui .batch-settings {
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+                margin-bottom: 12px;
+            }
+            
+            #chatgpt-automation-ui .batch-actions {
+                display: flex;
+                gap: 8px;
+                flex-wrap: wrap;
+                justify-content: flex-end;
+            }
+            
+            #chatgpt-automation-ui .wait-time-control {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                margin-top: 4px;
+            }
+            
+            #chatgpt-automation-ui .wait-time-control label {
+                font-size: 12px;
+                margin: 0;
+                white-space: nowrap;
+                color: var(--text-primary, #374151);
+            }
+            
+            #chatgpt-automation-ui.dark-mode .wait-time-control label {
+                color: var(--text-primary, #f3f4f6);
+            }
+            
+            #chatgpt-automation-ui .wait-time-control input[type="number"] {
+                width: 80px;
+                padding: 4px 8px;
+                border: 1px solid var(--border-medium, rgba(0,0,0,0.1));
+                border-radius: 4px;
+                font-size: 12px;
+                background: var(--input-background, #ffffff);
+                color: var(--text-primary, #374151);
+            }
+            
+            #chatgpt-automation-ui.dark-mode .wait-time-control input[type="number"] {
+                background: var(--input-background, #1e1e20);
+                color: var(--text-primary, #f3f4f6);
+                border-color: var(--border-medium, rgba(255,255,255,0.1));
+            }
+            
+            #chatgpt-automation-ui .wait-time-control input[type="number"]:focus {
+                outline: none;
+                border-color: var(--brand-purple, #6366f1);
+                box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.1);
             }
             
             #chatgpt-automation-ui .checkbox-label {
@@ -1021,6 +1204,15 @@
                 background: #dc2626;
             }
             
+            #chatgpt-automation-ui .btn-warning {
+                background: #f59e0b;
+                color: white;
+            }
+            
+            #chatgpt-automation-ui .btn-warning:hover {
+                background: #d97706;
+            }
+            
             #chatgpt-automation-ui .btn:disabled {
                 opacity: 0.5;
                 cursor: not-allowed;
@@ -1065,9 +1257,15 @@
                 color: var(--text-primary, #f3f4f6);
             }
             
+            #chatgpt-automation-ui .log-header-controls {
+                display: flex;
+                gap: 4px;
+            }
+            
             #chatgpt-automation-ui .log-content {
                 padding: 12px;
                 overflow-y: auto;
+                scroll-behavior: smooth;
             }
             
             #chatgpt-automation-ui .log-entry {
@@ -1193,6 +1391,16 @@
 
         // Bind events
         bindEvents();
+
+        // Initialize failed buttons visibility
+        updateFailedButtonsVisibility();
+
+        // Initialize auto-scroll button state
+        const autoScrollBtn = document.getElementById('toggle-auto-scroll-btn');
+        if (autoScrollBtn) {
+            autoScrollBtn.style.opacity = autoScrollLogs ? '1' : '0.5';
+            autoScrollBtn.title = autoScrollLogs ? 'Auto-scroll: ON' : 'Auto-scroll: OFF';
+        }
 
         // Watch for theme changes
         const observer = new MutationObserver(() => {
@@ -1374,6 +1582,9 @@
                 if (!isLooping) {
                     document.getElementById('stop-batch-btn').style.display = 'none';
                 }
+                
+                // Update failed buttons visibility
+                updateFailedButtonsVisibility();
             }
         });
 
@@ -1381,6 +1592,85 @@
         document.getElementById('stop-batch-btn').addEventListener('click', () => {
             stopBatchProcessing();
             document.getElementById('stop-batch-btn').style.display = 'none';
+            updateFailedButtonsVisibility();
+        });
+
+        // Auto-remove processed items checkbox
+        document.getElementById('auto-remove-checkbox').addEventListener('change', (e) => {
+            autoRemoveProcessed = e.target.checked;
+            log(`Auto-remove processed items: ${autoRemoveProcessed ? 'enabled' : 'disabled'}`);
+        });
+
+        // New chat per item checkbox
+        document.getElementById('new-chat-checkbox').addEventListener('change', (e) => {
+            newChatPerItem = e.target.checked;
+            log(`New chat per item: ${newChatPerItem ? 'enabled' : 'disabled'}`);
+        });
+
+        // Auto-scroll logs checkbox
+        document.getElementById('auto-scroll-checkbox').addEventListener('change', (e) => {
+            autoScrollLogs = e.target.checked;
+            log(`Auto-scroll logs: ${autoScrollLogs ? 'enabled' : 'disabled'}`);
+            
+            // Update button state
+            const btn = document.getElementById('toggle-auto-scroll-btn');
+            if (btn) {
+                btn.style.opacity = autoScrollLogs ? '1' : '0.5';
+                btn.title = autoScrollLogs ? 'Auto-scroll: ON' : 'Auto-scroll: OFF';
+            }
+            
+            // If enabling auto-scroll, scroll to bottom immediately
+            if (autoScrollLogs && logContainer) {
+                logContainer.scrollTop = logContainer.scrollHeight;
+            }
+        });
+
+        // Wait time input
+        document.getElementById('wait-time-input').addEventListener('change', (e) => {
+            const value = parseInt(e.target.value);
+            if (value >= 0 && value <= 30000) {
+                batchWaitTime = value;
+                log(`Wait time between items set to ${value}ms`);
+            } else {
+                e.target.value = batchWaitTime;
+                log('Invalid wait time, keeping current value', 'warning');
+            }
+        });
+
+        // Retry failed items button
+        document.getElementById('retry-failed-btn').addEventListener('click', async () => {
+            if (failedElements.length === 0) {
+                log('No failed items to retry', 'warning');
+                return;
+            }
+
+            log(`Retrying ${failedElements.length} failed items...`);
+            
+            // Get current template and custom code
+            const message = templateInput.value.trim();
+            const customCode = customCodeInput.value.trim();
+            
+            if (!message) {
+                log('Please enter a template message', 'warning');
+                return;
+            }
+
+            // Set loop mode and start processing
+            isLooping = document.getElementById('loop-checkbox').checked;
+            if (isLooping) {
+                document.getElementById('stop-batch-btn').style.display = 'inline-block';
+            }
+
+            await processMessage(message, customCode, true);
+            updateFailedButtonsVisibility();
+        });
+
+        // Clear failed items button
+        document.getElementById('clear-failed-btn').addEventListener('click', () => {
+            const count = failedElements.length;
+            failedElements = [];
+            log(`Cleared ${count} failed items from retry queue`);
+            updateFailedButtonsVisibility();
         });
 
         // Clear button
@@ -1390,6 +1680,9 @@
             templateInput.value = '';
             dynamicElementsInput.value = '';
             document.getElementById('loop-checkbox').checked = false;
+            // Also clear failed items
+            failedElements = [];
+            updateFailedButtonsVisibility();
             log('Form cleared');
         });
 
@@ -1407,6 +1700,24 @@
         document.getElementById('clear-log-btn').addEventListener('click', () => {
             logContainer.innerHTML = '';
             log('Log cleared');
+        });
+
+        // Toggle auto-scroll button
+        document.getElementById('toggle-auto-scroll-btn').addEventListener('click', () => {
+            autoScrollLogs = !autoScrollLogs;
+            const checkbox = document.getElementById('auto-scroll-checkbox');
+            if (checkbox) checkbox.checked = autoScrollLogs;
+            
+            const btn = document.getElementById('toggle-auto-scroll-btn');
+            btn.style.opacity = autoScrollLogs ? '1' : '0.5';
+            btn.title = autoScrollLogs ? 'Auto-scroll: ON' : 'Auto-scroll: OFF';
+            
+            log(`Auto-scroll logs: ${autoScrollLogs ? 'enabled' : 'disabled'}`);
+            
+            // If enabling auto-scroll, scroll to bottom immediately
+            if (autoScrollLogs && logContainer) {
+                logContainer.scrollTop = logContainer.scrollHeight;
+            }
         });
 
         // Minimize button
