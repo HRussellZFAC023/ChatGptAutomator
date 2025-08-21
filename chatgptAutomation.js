@@ -15,6 +15,7 @@
 // @run-at       document-end
 // @updateURL    https://raw.githubusercontent.com/HRussellZFAC023/ChatGptAutomator/main/chatgptAutomation.js
 // @downloadURL  https://raw.githubusercontent.com/HRussellZFAC023/ChatGptAutomator/main/chatgptAutomation.js
+// @license      MIT
 // ==/UserScript==
 
 (function () {
@@ -22,7 +23,7 @@
 
     // Configuration
     const CONFIG = {
-        DEBUG_MODE: true,
+        DEBUG_MODE: false,
         RESPONSE_TIMEOUT: 3000000, // 5 minutes
         MIN_WIDTH: 300,
         MIN_HEIGHT: 200,
@@ -36,7 +37,6 @@
     let isLooping = false;
     let currentBatchIndex = 0;
     let dynamicElements = [];
-    let failedElements = []; // Queue for failed items
     let lastResponseElement = null;
     let responseObserver = null;
     let isMinimized = false;
@@ -47,6 +47,29 @@
     let autoRemoveProcessed = true; // Whether to remove processed items from textbox
     let autoScrollLogs = true; // Whether to auto-scroll logs
     let newChatPerItem = false; // Whether to start new chat for each item
+
+    // Storage keys
+    const STORAGE_KEYS = {
+        messageInput: 'messageInput',
+        templateInput: 'templateInput',
+        dynamicElementsInput: 'dynamicElementsInput',
+        customCodeInput: 'customCodeInput',
+        loop: 'looping',
+        autoRemove: 'autoRemoveProcessed',
+        newChat: 'newChatPerItem',
+        autoScroll: 'autoScrollLogs',
+        waitTime: 'batchWaitTime',
+        activeTab: 'activeTab',
+        uiState: 'uiState',
+        // Config keys
+        configDebug: 'config.debugMode',
+        configTimeout: 'config.responseTimeout',
+        configMinWidth: 'config.minWidth',
+        configMinHeight: 'config.minHeight',
+        configMaxWidth: 'config.maxWidth',
+        configMaxHeight: 'config.maxHeight',
+        configDefaultVisible: 'config.defaultVisible'
+    };
 
     // UI Elements
     let mainContainer = null;
@@ -237,35 +260,46 @@
         }
     };
 
-    // Save UI state
-    const saveUIState = () => {
-        const state = {
-            position: {
-                left: mainContainer.style.left,
-                top: mainContainer.style.top,
-                right: mainContainer.style.right
-            },
-            size: {
-                width: mainContainer.style.width,
-                height: mainContainer.style.height
-            },
-            minimized: isMinimized,
-            visible: uiVisible
-        };
-        GM_setValue('uiState', JSON.stringify(state));
+    // Storage helper to reduce repetitive try-catch blocks
+    const saveToStorage = (key, value) => {
+        try { GM_setValue(key, value); } catch {}
     };
 
-    // Load UI state
+    // Save UI state (simplified with debouncing)
+    let saveTimeout;
+    const saveUIState = (immediate = false) => {
+        if (!mainContainer) return;
+        
+        const doSave = () => {
+            const state = {
+                left: mainContainer.style.left,
+                top: mainContainer.style.top,
+                right: mainContainer.style.right,
+                width: mainContainer.style.width,
+                height: mainContainer.style.height,
+                minimized: isMinimized,
+                visible: uiVisible
+            };
+            GM_setValue(STORAGE_KEYS.uiState, JSON.stringify(state));
+        };
+
+        if (immediate) {
+            clearTimeout(saveTimeout);
+            doSave();
+        } else {
+            clearTimeout(saveTimeout);
+            saveTimeout = setTimeout(doSave, 100); // Debounce saves
+        }
+    };
+
+    // Load UI state (simplified)
     const loadUIState = () => {
         try {
-            const savedState = GM_getValue('uiState', null);
-            if (savedState) {
-                return JSON.parse(savedState);
-            }
-        } catch (error) {
-            log('Error loading UI state', 'warning');
+            const saved = GM_getValue(STORAGE_KEYS.uiState, null);
+            return saved ? JSON.parse(saved) : {};
+        } catch {
+            return {};
         }
-        return null;
     };
 
 
@@ -301,6 +335,8 @@
             try {
                 const newValue = JSON.stringify(remainingElements, null, 2);
                 dynamicElementsInput.value = newValue;
+                // Persist queue text so we can resume after refresh
+                GM_setValue(STORAGE_KEYS.dynamicElementsInput, newValue);
                 log(`Updated queue: ${remainingElements.length} items remaining`);
             } catch (error) {
                 log(`Error updating display: ${error.message}`, 'warning');
@@ -461,7 +497,6 @@
         if (!isLooping) {
             isProcessing = true;
             currentBatchIndex = 0;
-            failedElements = []; // Reset failed queue
         }
 
         updateStatus('processing');
@@ -470,35 +505,27 @@
             let messagesToProcess = [];
 
             if (isTemplate && dynamicElements.length > 0) {
-                // Add any failed elements to the front of the queue
-                const allElements = [...failedElements, ...dynamicElements.slice(currentBatchIndex)];
-                
-                // Debug: Log the elements being processed
-                if (CONFIG.DEBUG_MODE) {
-                    log(`Processing ${allElements.length} elements. First element: ${JSON.stringify(allElements[0])}`);
-                }
-                
                 // Process template with dynamic elements
-                messagesToProcess = allElements.map((element, index) => ({
+                messagesToProcess = dynamicElements.map((element, index) => ({
                     message: processDynamicTemplate(message, {
                         item: element,
                         index: index + 1,
-                        total: allElements.length
+                        total: dynamicElements.length
                     }),
                     customCode,
                     elementData: element,
-                    index: index + 1,
-                    originalIndex: dynamicElements.indexOf(element)
+                    index: index + 1
                 }));
                 
-                // Clear failed elements since we're processing them
-                failedElements = [];
+                if (CONFIG.DEBUG_MODE) {
+                    log(`Processing ${messagesToProcess.length} elements. First element: ${JSON.stringify(dynamicElements[0])}`);
+                }
             } else {
                 messagesToProcess = [{ message, customCode }];
             }
 
             for (let i = 0; i < messagesToProcess.length; i++) {
-                const { message: processedMessage, customCode: code, elementData, index, originalIndex } = messagesToProcess[i];
+                const { message: processedMessage, customCode: code, elementData, index } = messagesToProcess[i];
                 
                 updateProgress(i + 1, messagesToProcess.length);
 
@@ -506,72 +533,77 @@
                     log(`Processing item ${index}/${messagesToProcess.length}: ${JSON.stringify(elementData)}`);
                 }
 
-                try {
-                    // Start new chat if option is enabled and not the first item
-                    if (newChatPerItem && i > 0) {
-                        const success = await startNewChat();
-                        if (!success) {
-                            log('Failed to start new chat, continuing in current chat', 'warning');
+                let success = false;
+                let retryCount = 0;
+                const maxRetries = 3;
+
+                while (!success && retryCount <= maxRetries) {
+                    try {
+                        if (retryCount > 0) {
+                            log(`Retry attempt ${retryCount} for item ${index}...`);
+                            await sleep(batchWaitTime); // Wait before retry
                         }
-                        await sleep(1000); // Additional wait after new chat
-                    }
 
-                    log(`Starting message processing...`);
-
-                    // Type the message
-                    await typeMessage(processedMessage);
-                    await sleep(500);
-
-                    // Send the message
-                    await sendMessage();
-                    updateStatus('waiting');
-
-                    // Wait for response
-                    log('Waiting for ChatGPT response...');
-                    const responseElement = await waitForResponse();
-                    const responseText = extractResponseText(responseElement);
-
-                    log('Response received');
-                    console.log('ChatGPT Response:', responseText);
-
-                    // Execute custom code if provided
-                    if (code && code.trim() !== '') {
-                        if (isTemplate) {
-                            try { log(`Custom code context -> index: ${index ?? 'null'}/${messagesToProcess.length}, item: ${elementData ? JSON.stringify(elementData).slice(0,200) : 'null'}`); } catch { /* no-op */ }
+                        // Start new chat if option is enabled and not the first item
+                        if (newChatPerItem && (i > 0 || retryCount > 0)) {
+                            const chatSuccess = await startNewChat();
+                            if (!chatSuccess) {
+                                log('Failed to start new chat, continuing in current chat', 'warning');
+                            }
+                            await sleep(1000); // Additional wait after new chat
                         }
-                        log('Executing custom code...');
-                        await executeCustomCode(code, responseText, {
-                            elementData,
-                            index,
-                            total: messagesToProcess.length
-                        });
-                    }
 
-                    // Item processed successfully - remove from original array if auto-remove is enabled
-                    if (isTemplate && autoRemoveProcessed && originalIndex !== undefined && originalIndex >= 0) {
-                        dynamicElements.splice(originalIndex, 1);
-                        // Update indices for remaining items
-                        for (let j = i + 1; j < messagesToProcess.length; j++) {
-                            if (messagesToProcess[j].originalIndex > originalIndex) {
-                                messagesToProcess[j].originalIndex--;
+                        log(`Starting message processing...`);
+
+                        // Type the message
+                        await typeMessage(processedMessage);
+                        await sleep(500);
+
+                        // Send the message
+                        await sendMessage();
+                        updateStatus('waiting');
+
+                        // Wait for response
+                        log('Waiting for ChatGPT response...');
+                        const responseElement = await waitForResponse();
+                        const responseText = extractResponseText(responseElement);
+
+                        log('Response received');
+                        console.log('ChatGPT Response:', responseText);
+
+                        // Execute custom code if provided
+                        if (code && code.trim() !== '') {
+                            if (isTemplate) {
+                                try { log(`Custom code context -> index: ${index ?? 'null'}/${messagesToProcess.length}, item: ${elementData ? JSON.stringify(elementData).slice(0,200) : 'null'}`); } catch { /* no-op */ }
+                            }
+                            log('Executing custom code...');
+                            await executeCustomCode(code, responseText, {
+                                elementData,
+                                index,
+                                total: messagesToProcess.length
+                            });
+                        }
+
+                        // Item processed successfully - remove from queue text if auto-remove is enabled
+                        if (isTemplate && autoRemoveProcessed) {
+                            const idx = dynamicElements.indexOf(elementData);
+                            if (idx >= 0) {
+                                dynamicElements.splice(idx, 1);
+                                updateDynamicElementsDisplay(dynamicElements);
                             }
                         }
-                        updateDynamicElementsDisplay(dynamicElements);
-                    }
 
-                    log(`Item ${index} processed successfully`);
+                        log(`Item ${index} processed successfully`);
+                        success = true;
 
-                } catch (itemError) {
-                    log(`Error processing item ${index}: ${itemError.message}`, 'error');
-                    
-                    // Add failed item to retry queue (front of queue for next batch)
-                    if (isTemplate && elementData) {
-                        failedElements.unshift(elementData);
-                        log(`Item ${index} added to retry queue`, 'warning');
+                    } catch (itemError) {
+                        retryCount++;
+                        log(`Error processing item ${index} (attempt ${retryCount}): ${itemError.message}`, 'error');
+                        
+                        if (retryCount > maxRetries) {
+                            log(`Item ${index} failed after ${maxRetries} retries, skipping...`, 'error');
+                        }
                     }
-                    
-                    // Continue with next item instead of stopping entire batch
-                    log('Continuing with next item...', 'info');
                 }
 
                 // Add delay between batch items (user configurable)
@@ -582,14 +614,6 @@
 
                 // Check if loop should continue
                 if (!isLooping) break;
-            }
-
-            // Show retry queue status
-            if (failedElements.length > 0) {
-                log(`Batch completed with ${failedElements.length} failed items in retry queue`, 'warning');
-                log('Failed items will be retried in next batch run', 'info');
-            } else {
-                log('All items processed successfully');
             }
 
             updateStatus('complete');
@@ -617,24 +641,6 @@
         updateStatus('idle');
         updateProgress(0, 0);
         log('Batch processing stopped');
-    };
-
-    // Update visibility of failed items buttons
-    const updateFailedButtonsVisibility = () => {
-        const retryBtn = document.getElementById('retry-failed-btn');
-        const clearBtn = document.getElementById('clear-failed-btn');
-        const failedCountSpan = document.getElementById('failed-count');
-        
-        if (retryBtn && clearBtn && failedCountSpan) {
-            if (failedElements.length > 0) {
-                retryBtn.style.display = 'inline-block';
-                clearBtn.style.display = 'inline-block';
-                failedCountSpan.textContent = failedElements.length;
-            } else {
-                retryBtn.style.display = 'none';
-                clearBtn.style.display = 'none';
-            }
-        }
     };
 
     // Update progress bar
@@ -694,6 +700,7 @@
                         <button class="tab-btn active" data-tab="simple">Simple</button>
                         <button class="tab-btn" data-tab="template">Template</button>
                         <button class="tab-btn" data-tab="advanced">Response (JS)</button>
+                        <button class="tab-btn" data-tab="settings">Settings</button>
                     </div>
                     
                     <div class="tab-content active" id="simple-tab">
@@ -743,12 +750,6 @@
                                     Start new chat for each item
                                 </label>
                                 
-                                <label class="checkbox-label">
-                                    <input type="checkbox" id="auto-scroll-checkbox" checked>
-                                    <span class="checkmark"></span>
-                                    Auto-scroll logs
-                                </label>
-                                
                                 <div class="wait-time-control">
                                     <label for="wait-time-input">Wait between items (ms):</label>
                                     <input type="number" id="wait-time-input" min="100" max="30000" value="2000" step="100">
@@ -757,8 +758,6 @@
                             
                             <div class="batch-actions">
                                 <button id="stop-batch-btn" class="btn btn-danger" style="display: none;">Stop Batch</button>
-                                <button id="retry-failed-btn" class="btn btn-warning" style="display: none;">Retry Failed (<span id="failed-count">0</span>)</button>
-                                <button id="clear-failed-btn" class="btn btn-secondary" style="display: none;">Clear Failed</button>
                             </div>
                         </div>
                     </div>
@@ -778,6 +777,51 @@
                                 </div>
                             </div>
                             <div class="help-text">Runs your JavaScript after ChatGPT finishes. Use <code>response</code> (string), <code>log()</code>, and <code>http</code> (CORS-capable) to integrate with any website's API.</div>
+                        </div>
+                    </div>
+                    
+                    <div class="tab-content" id="settings-tab">
+                        <div class="form-group">
+                            <label>Debug mode:</label>
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="debug-mode-checkbox">
+                                <span class="checkmark"></span>
+                                Enable debug logging
+                            </label>
+                        </div>
+                        <div class="form-group">
+                            <label for="response-timeout-input">Response timeout (ms):</label>
+                            <input type="number" id="response-timeout-input" min="10000" max="6000000" step="1000" class="settings-input timeout">
+                        </div>
+                        <div class="form-group">
+                            <label>Panel size limits (px):</label>
+                            <div class="size-inputs-grid">
+                                <div class="size-input-group">
+                                    <label for="min-width-input">Min width</label>
+                                    <input type="number" id="min-width-input" min="200" max="1200" step="10" class="settings-input size">
+                                </div>
+                                <div class="size-input-group">
+                                    <label for="min-height-input">Min height</label>
+                                    <input type="number" id="min-height-input" min="120" max="1200" step="10" class="settings-input size">
+                                </div>
+                                <div class="size-input-group">
+                                    <label for="max-width-input">Max width</label>
+                                    <input type="number" id="max-width-input" min="200" max="2000" step="10" class="settings-input size">
+                                </div>
+                                <div class="size-input-group">
+                                    <label for="max-height-input">Max height</label>
+                                    <input type="number" id="max-height-input" min="120" max="2000" step="10" class="settings-input size">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Visibility:</label>
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="default-visible-checkbox">
+                                <span class="checkmark"></span>
+                                Show panel by default
+                            </label>
+                            <div class="help-text">Controls default visibility on page load. You can still toggle from the header button.</div>
                         </div>
                     </div>
                     
@@ -842,11 +886,27 @@
                 color: var(--text-primary, #ffffff);
             }
             
-            #chatgpt-automation-ui.minimized { resize: none; }
-            #chatgpt-automation-ui.minimized .automation-content {overflow-y: auto; }
+            #chatgpt-automation-ui.minimized { 
+                resize: none; 
+                height: auto !important;
+                min-height: auto !important;
+            }
+            #chatgpt-automation-ui.minimized .automation-content {
+                overflow-y: auto; 
+                max-height: 300px;
+            }
             #chatgpt-automation-ui.minimized .progress-container,
-            #chatgpt-automation-ui.minimized .automation-form { display: none; }
-            #chatgpt-automation-ui.minimized .automation-log { display: block !important; }
+            #chatgpt-automation-ui.minimized .automation-form { 
+                display: none; 
+            }
+            #chatgpt-automation-ui.minimized .automation-log { 
+                display: block !important; 
+            }
+            #chatgpt-automation-ui.minimized .automation-header {
+                position: sticky;
+                top: 0;
+                z-index: 1;
+            }
             
             #chatgpt-automation-ui .automation-header {
                 background: linear-gradient(135deg, var(--brand-purple, #6366f1) 0%, var(--brand-purple-darker, #4f46e5) 100%);
@@ -1129,6 +1189,58 @@
                 box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.1);
             }
             
+            /* Settings input styles */
+            #chatgpt-automation-ui .settings-input {
+                padding: 6px 8px;
+                border: 1px solid var(--border-medium, rgba(0,0,0,0.1));
+                border-radius: 6px;
+                font-size: 13px;
+                background: var(--input-background, #ffffff);
+                color: var(--text-primary, #374151);
+            }
+            
+            #chatgpt-automation-ui.dark-mode .settings-input {
+                background: var(--input-background, #1e1e20);
+                color: var(--text-primary, #f3f4f6);
+                border-color: var(--border-medium, rgba(255,255,255,0.1));
+            }
+            
+            #chatgpt-automation-ui .settings-input:focus {
+                outline: none;
+                border-color: var(--brand-purple, #6366f1);
+                box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+            }
+            
+            #chatgpt-automation-ui .settings-input.timeout {
+                width: 140px;
+            }
+            
+            #chatgpt-automation-ui .size-inputs-grid {
+                display: flex;
+                gap: 8px;
+                flex-wrap: wrap;
+            }
+            
+            #chatgpt-automation-ui .size-input-group {
+                display: flex;
+                flex-direction: column;
+                gap: 4px;
+            }
+            
+            #chatgpt-automation-ui .size-input-group label {
+                font-size: 12px;
+                margin: 0;
+                color: var(--text-primary, #374151);
+            }
+            
+            #chatgpt-automation-ui.dark-mode .size-input-group label {
+                color: var(--text-primary, #f3f4f6);
+            }
+            
+            #chatgpt-automation-ui .settings-input.size {
+                width: 120px;
+            }
+            
             #chatgpt-automation-ui .checkbox-label {
                 display: flex;
                 align-items: center;
@@ -1360,29 +1472,109 @@
         progressBar = document.getElementById('progress-container');
         resizeHandle = document.getElementById('resize-handle');
 
+        // Restore saved inputs, toggles and config
+        try {
+            // Textareas
+            messageInput.value = GM_getValue(STORAGE_KEYS.messageInput, '') || '';
+            templateInput.value = GM_getValue(STORAGE_KEYS.templateInput, '') || '';
+            const savedDyn = GM_getValue(STORAGE_KEYS.dynamicElementsInput, '');
+            if (typeof savedDyn === 'string') dynamicElementsInput.value = savedDyn;
+            customCodeInput.value = GM_getValue(STORAGE_KEYS.customCodeInput, '') || '';
+
+            // Checkboxes and switches
+            const loopEl = document.getElementById('loop-checkbox');
+            const autoRemoveEl = document.getElementById('auto-remove-checkbox');
+            const newChatEl = document.getElementById('new-chat-checkbox');
+
+            if (loopEl) {
+                loopEl.checked = !!GM_getValue(STORAGE_KEYS.loop, false);
+                isLooping = loopEl.checked;
+            }
+            if (autoRemoveEl) {
+                autoRemoveEl.checked = GM_getValue(STORAGE_KEYS.autoRemove, true);
+                autoRemoveProcessed = autoRemoveEl.checked;
+            }
+            if (newChatEl) {
+                newChatEl.checked = !!GM_getValue(STORAGE_KEYS.newChat, false);
+                newChatPerItem = newChatEl.checked;
+            }
+
+            // Auto-scroll state (button only, no checkbox)
+            autoScrollLogs = GM_getValue(STORAGE_KEYS.autoScroll, true);
+
+            // Wait time
+            const waitInput = document.getElementById('wait-time-input');
+            const savedWait = parseInt(GM_getValue(STORAGE_KEYS.waitTime, batchWaitTime));
+            if (!Number.isNaN(savedWait)) {
+                batchWaitTime = savedWait;
+                if (waitInput) waitInput.value = String(savedWait);
+            }
+
+            // Active tab
+            const savedTab = GM_getValue(STORAGE_KEYS.activeTab, 'simple');
+            const tabBtn = document.querySelector(`.tab-btn[data-tab="${savedTab}"]`);
+            if (tabBtn) tabBtn.click();
+
+            // Config - apply saved values and reflect in UI
+            const dbgVal = !!GM_getValue(STORAGE_KEYS.configDebug, CONFIG.DEBUG_MODE);
+            CONFIG.DEBUG_MODE = dbgVal;
+            const dbgEl = document.getElementById('debug-mode-checkbox');
+            if (dbgEl) dbgEl.checked = dbgVal;
+
+            const toVal = parseInt(GM_getValue(STORAGE_KEYS.configTimeout, CONFIG.RESPONSE_TIMEOUT));
+            if (!Number.isNaN(toVal)) CONFIG.RESPONSE_TIMEOUT = toVal;
+            const toEl = document.getElementById('response-timeout-input');
+            if (toEl) toEl.value = String(CONFIG.RESPONSE_TIMEOUT);
+
+            const minW = parseInt(GM_getValue(STORAGE_KEYS.configMinWidth, CONFIG.MIN_WIDTH));
+            const minH = parseInt(GM_getValue(STORAGE_KEYS.configMinHeight, CONFIG.MIN_HEIGHT));
+            const maxW = parseInt(GM_getValue(STORAGE_KEYS.configMaxWidth, CONFIG.MAX_WIDTH));
+            const maxH = parseInt(GM_getValue(STORAGE_KEYS.configMaxHeight, CONFIG.MAX_HEIGHT));
+            if (!Number.isNaN(minW)) CONFIG.MIN_WIDTH = minW;
+            if (!Number.isNaN(minH)) CONFIG.MIN_HEIGHT = minH;
+            if (!Number.isNaN(maxW)) CONFIG.MAX_WIDTH = maxW;
+            if (!Number.isNaN(maxH)) CONFIG.MAX_HEIGHT = maxH;
+            const minWEl = document.getElementById('min-width-input');
+            const minHEl = document.getElementById('min-height-input');
+            const maxWEl = document.getElementById('max-width-input');
+            const maxHEl = document.getElementById('max-height-input');
+            if (minWEl) minWEl.value = String(CONFIG.MIN_WIDTH);
+            if (minHEl) minHEl.value = String(CONFIG.MIN_HEIGHT);
+            if (maxWEl) maxWEl.value = String(CONFIG.MAX_WIDTH);
+            if (maxHEl) maxHEl.value = String(CONFIG.MAX_HEIGHT);
+            // Override CSS min/max with inline styles so changes take effect immediately
+            mainContainer.style.minWidth = CONFIG.MIN_WIDTH + 'px';
+            mainContainer.style.minHeight = CONFIG.MIN_HEIGHT + 'px';
+            mainContainer.style.maxWidth = CONFIG.MAX_WIDTH + 'px';
+            mainContainer.style.maxHeight = CONFIG.MAX_HEIGHT + 'px';
+
+            const defVis = !!GM_getValue(STORAGE_KEYS.configDefaultVisible, CONFIG.DEFAULT_VISIBLE);
+            CONFIG.DEFAULT_VISIBLE = defVis;
+            const dvEl = document.getElementById('default-visible-checkbox');
+            if (dvEl) dvEl.checked = defVis;
+        } catch {}
+
         // Load saved state
         const savedState = loadUIState();
-        if (savedState) {
-            if (savedState.position.left) {
-                mainContainer.style.left = savedState.position.left;
-                mainContainer.style.right = 'auto';
-            }
-            if (savedState.position.top) {
-                mainContainer.style.top = savedState.position.top;
-            }
-            if (savedState.size.width) {
-                mainContainer.style.width = savedState.size.width;
-            }
-            if (savedState.size.height) {
-                mainContainer.style.height = savedState.size.height;
-            }
-            if (savedState.minimized) {
-                isMinimized = true;
-                mainContainer.classList.add('minimized');
-            }
-            if (typeof savedState.visible === 'boolean') {
-                uiVisible = savedState.visible;
-            }
+        if (savedState.left) {
+            mainContainer.style.left = savedState.left;
+            mainContainer.style.right = 'auto';
+        }
+        if (savedState.top) {
+            mainContainer.style.top = savedState.top;
+        }
+        if (savedState.width) {
+            mainContainer.style.width = savedState.width;
+        }
+        if (savedState.height) {
+            mainContainer.style.height = savedState.height;
+        }
+        if (savedState.minimized) {
+            isMinimized = true;
+            mainContainer.classList.add('minimized');
+        }
+        if (typeof savedState.visible === 'boolean') {
+            uiVisible = savedState.visible;
         }
         // Default hidden based on persisted/CONFIG
         if (!uiVisible) {
@@ -1391,9 +1583,6 @@
 
         // Bind events
         bindEvents();
-
-        // Initialize failed buttons visibility
-        updateFailedButtonsVisibility();
 
         // Initialize auto-scroll button state
         const autoScrollBtn = document.getElementById('toggle-auto-scroll-btn');
@@ -1465,7 +1654,7 @@
         }
         // Also ensure the UI exists if it should be visible
         const savedState = loadUIState();
-        const shouldShow = savedState ? savedState.visible === true : CONFIG.DEFAULT_VISIBLE;
+        const shouldShow = savedState.visible === true || CONFIG.DEFAULT_VISIBLE;
         if (shouldShow && !document.getElementById('chatgpt-automation-ui')) {
             createUI();
         }
@@ -1482,7 +1671,7 @@
                 // Ensure UI matches persisted visibility
                 const savedState = loadUIState();
                 const ui = document.getElementById('chatgpt-automation-ui');
-                const shouldShow = savedState ? !!savedState.visible : CONFIG.DEFAULT_VISIBLE;
+                const shouldShow = savedState.visible === true || CONFIG.DEFAULT_VISIBLE;
                 if (ui) {
                     ui.style.display = shouldShow ? 'block' : 'none';
                 } else if (shouldShow) {
@@ -1523,6 +1712,9 @@
                 // Update active tab content
                 document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
                 document.getElementById(`${tabName}-tab`).classList.add('active');
+
+                // Persist active tab
+                saveToStorage(STORAGE_KEYS.activeTab, tabName);
             });
         });
 
@@ -1582,9 +1774,6 @@
                 if (!isLooping) {
                     document.getElementById('stop-batch-btn').style.display = 'none';
                 }
-                
-                // Update failed buttons visibility
-                updateFailedButtonsVisibility();
             }
         });
 
@@ -1592,37 +1781,20 @@
         document.getElementById('stop-batch-btn').addEventListener('click', () => {
             stopBatchProcessing();
             document.getElementById('stop-batch-btn').style.display = 'none';
-            updateFailedButtonsVisibility();
         });
 
         // Auto-remove processed items checkbox
         document.getElementById('auto-remove-checkbox').addEventListener('change', (e) => {
             autoRemoveProcessed = e.target.checked;
             log(`Auto-remove processed items: ${autoRemoveProcessed ? 'enabled' : 'disabled'}`);
+            saveToStorage(STORAGE_KEYS.autoRemove, autoRemoveProcessed);
         });
 
         // New chat per item checkbox
         document.getElementById('new-chat-checkbox').addEventListener('change', (e) => {
             newChatPerItem = e.target.checked;
             log(`New chat per item: ${newChatPerItem ? 'enabled' : 'disabled'}`);
-        });
-
-        // Auto-scroll logs checkbox
-        document.getElementById('auto-scroll-checkbox').addEventListener('change', (e) => {
-            autoScrollLogs = e.target.checked;
-            log(`Auto-scroll logs: ${autoScrollLogs ? 'enabled' : 'disabled'}`);
-            
-            // Update button state
-            const btn = document.getElementById('toggle-auto-scroll-btn');
-            if (btn) {
-                btn.style.opacity = autoScrollLogs ? '1' : '0.5';
-                btn.title = autoScrollLogs ? 'Auto-scroll: ON' : 'Auto-scroll: OFF';
-            }
-            
-            // If enabling auto-scroll, scroll to bottom immediately
-            if (autoScrollLogs && logContainer) {
-                logContainer.scrollTop = logContainer.scrollHeight;
-            }
+            saveToStorage(STORAGE_KEYS.newChat, newChatPerItem);
         });
 
         // Wait time input
@@ -1631,46 +1803,11 @@
             if (value >= 0 && value <= 30000) {
                 batchWaitTime = value;
                 log(`Wait time between items set to ${value}ms`);
+                saveToStorage(STORAGE_KEYS.waitTime, batchWaitTime);
             } else {
                 e.target.value = batchWaitTime;
                 log('Invalid wait time, keeping current value', 'warning');
             }
-        });
-
-        // Retry failed items button
-        document.getElementById('retry-failed-btn').addEventListener('click', async () => {
-            if (failedElements.length === 0) {
-                log('No failed items to retry', 'warning');
-                return;
-            }
-
-            log(`Retrying ${failedElements.length} failed items...`);
-            
-            // Get current template and custom code
-            const message = templateInput.value.trim();
-            const customCode = customCodeInput.value.trim();
-            
-            if (!message) {
-                log('Please enter a template message', 'warning');
-                return;
-            }
-
-            // Set loop mode and start processing
-            isLooping = document.getElementById('loop-checkbox').checked;
-            if (isLooping) {
-                document.getElementById('stop-batch-btn').style.display = 'inline-block';
-            }
-
-            await processMessage(message, customCode, true);
-            updateFailedButtonsVisibility();
-        });
-
-        // Clear failed items button
-        document.getElementById('clear-failed-btn').addEventListener('click', () => {
-            const count = failedElements.length;
-            failedElements = [];
-            log(`Cleared ${count} failed items from retry queue`);
-            updateFailedButtonsVisibility();
         });
 
         // Clear button
@@ -1680,10 +1817,16 @@
             templateInput.value = '';
             dynamicElementsInput.value = '';
             document.getElementById('loop-checkbox').checked = false;
-            // Also clear failed items
-            failedElements = [];
-            updateFailedButtonsVisibility();
             log('Form cleared');
+
+            // Persist cleared state
+            try {
+                GM_setValue(STORAGE_KEYS.messageInput, '');
+                GM_setValue(STORAGE_KEYS.customCodeInput, '');
+                GM_setValue(STORAGE_KEYS.templateInput, '');
+                GM_setValue(STORAGE_KEYS.dynamicElementsInput, '');
+                GM_setValue(STORAGE_KEYS.loop, false);
+            } catch {}
         });
 
         // Toggle log button
@@ -1705,8 +1848,6 @@
         // Toggle auto-scroll button
         document.getElementById('toggle-auto-scroll-btn').addEventListener('click', () => {
             autoScrollLogs = !autoScrollLogs;
-            const checkbox = document.getElementById('auto-scroll-checkbox');
-            if (checkbox) checkbox.checked = autoScrollLogs;
             
             const btn = document.getElementById('toggle-auto-scroll-btn');
             btn.style.opacity = autoScrollLogs ? '1' : '0.5';
@@ -1718,6 +1859,9 @@
             if (autoScrollLogs && logContainer) {
                 logContainer.scrollTop = logContainer.scrollHeight;
             }
+            
+            // Save state to storage
+            saveToStorage(STORAGE_KEYS.autoScroll, autoScrollLogs);
         });
 
         // Minimize button
@@ -1728,14 +1872,14 @@
             } else {
                 mainContainer.classList.remove('minimized');
             }
-            saveUIState();
+            saveUIState(true); // Immediate save for user action
         });
 
         // Close button
         document.getElementById('close-btn').addEventListener('click', () => {
             mainContainer.style.display = 'none';
             uiVisible = false;
-            saveUIState();
+            saveUIState(true); // Immediate save for user action
             log('UI closed');
         });
 
@@ -1747,6 +1891,7 @@
                     const parsed = JSON.parse(input);
                     dynamicElementsInput.value = JSON.stringify(parsed, null, 2);
                     log('JSON formatted');
+                    saveToStorage(STORAGE_KEYS.dynamicElementsInput, dynamicElementsInput.value);
                 }
             } catch (error) {
                 log('Invalid JSON format', 'warning');
@@ -1812,6 +1957,7 @@ if (response.includes('error')) {
     }
 }`;
             customCodeInput.value = template;
+            try { GM_setValue(STORAGE_KEYS.customCodeInput, customCodeInput.value); } catch {}
         });
 
         // Keyboard shortcuts
@@ -1835,6 +1981,10 @@ if (response.includes('error')) {
         let isDragging = false;
         let dragOffset = { x: 0, y: 0 };
 
+        // Resizing functionality  
+        let isResizing = false;
+        let resizeStartX, resizeStartY, resizeStartWidth, resizeStartHeight;
+
         const header = document.getElementById('automation-header');
 
         header.addEventListener('mousedown', (e) => {
@@ -1848,28 +1998,6 @@ if (response.includes('error')) {
             e.preventDefault();
         });
 
-        document.addEventListener('mousemove', (e) => {
-            if (isDragging) {
-                const x = e.clientX - dragOffset.x;
-                const y = e.clientY - dragOffset.y;
-
-                mainContainer.style.left = `${Math.max(0, Math.min(x, window.innerWidth - mainContainer.offsetWidth))}px`;
-                mainContainer.style.top = `${Math.max(0, Math.min(y, window.innerHeight - mainContainer.offsetHeight))}px`;
-                mainContainer.style.right = 'auto';
-
-                saveUIState();
-            }
-        });
-
-        document.addEventListener('mouseup', () => {
-            isDragging = false;
-            header.style.userSelect = '';
-        });
-
-        // Resizing functionality
-        let isResizing = false;
-        let resizeStartX, resizeStartY, resizeStartWidth, resizeStartHeight;
-
         resizeHandle.addEventListener('mousedown', (e) => {
             isResizing = true;
             resizeStartX = e.clientX;
@@ -1880,19 +2008,121 @@ if (response.includes('error')) {
         });
 
         document.addEventListener('mousemove', (e) => {
-            if (isResizing) {
+            if (isDragging) {
+                const x = e.clientX - dragOffset.x;
+                const y = e.clientY - dragOffset.y;
+
+                mainContainer.style.left = `${Math.max(0, Math.min(x, window.innerWidth - mainContainer.offsetWidth))}px`;
+                mainContainer.style.top = `${Math.max(0, Math.min(y, window.innerHeight - mainContainer.offsetHeight))}px`;
+                mainContainer.style.right = 'auto';
+
+                saveUIState(); // Debounced for drag operations
+            } else if (isResizing) {
                 const newWidth = Math.max(CONFIG.MIN_WIDTH, Math.min(CONFIG.MAX_WIDTH, resizeStartWidth + (e.clientX - resizeStartX)));
                 const newHeight = Math.max(CONFIG.MIN_HEIGHT, Math.min(CONFIG.MAX_HEIGHT, resizeStartHeight + (e.clientY - resizeStartY)));
 
                 mainContainer.style.width = `${newWidth}px`;
                 mainContainer.style.height = `${newHeight}px`;
 
-                saveUIState();
+                saveUIState(); // Debounced for resize operations
             }
         });
 
         document.addEventListener('mouseup', () => {
-            isResizing = false;
+            if (isDragging) {
+                saveUIState(true); // Immediate save when drag ends
+                isDragging = false;
+                header.style.userSelect = '';
+            }
+            if (isResizing) {
+                saveUIState(true); // Immediate save when resize ends
+                isResizing = false;
+            }
+        });
+
+        // Consolidated input persistence
+        const persistInputs = [
+            { element: messageInput, key: STORAGE_KEYS.messageInput },
+            { element: templateInput, key: STORAGE_KEYS.templateInput },
+            { element: dynamicElementsInput, key: STORAGE_KEYS.dynamicElementsInput },
+            { element: customCodeInput, key: STORAGE_KEYS.customCodeInput }
+        ];
+
+        persistInputs.forEach(({ element, key }) => {
+            element.addEventListener('input', () => saveToStorage(key, element.value));
+        });
+
+        // Persist loop checkbox when used
+        const loopEl = document.getElementById('loop-checkbox');
+        loopEl.addEventListener('change', (e) => {
+            isLooping = e.target.checked;
+            saveToStorage(STORAGE_KEYS.loop, isLooping);
+        });
+
+        // Settings: Debug mode
+        const debugEl = document.getElementById('debug-mode-checkbox');
+        if (debugEl) {
+            debugEl.addEventListener('change', (e) => {
+                CONFIG.DEBUG_MODE = !!e.target.checked;
+                saveToStorage(STORAGE_KEYS.configDebug, CONFIG.DEBUG_MODE);
+                log(`Debug mode ${CONFIG.DEBUG_MODE ? 'enabled' : 'disabled'}`);
+            });
+        }
+
+        // Settings: Response timeout
+        const timeoutEl = document.getElementById('response-timeout-input');
+        if (timeoutEl) {
+            timeoutEl.addEventListener('change', (e) => {
+                const v = parseInt(e.target.value);
+                if (!Number.isNaN(v) && v >= 10000 && v <= 6000000) {
+                    CONFIG.RESPONSE_TIMEOUT = v;
+                    saveToStorage(STORAGE_KEYS.configTimeout, v);
+                    log(`Response timeout set to ${v}ms`);
+                } else {
+                    e.target.value = String(CONFIG.RESPONSE_TIMEOUT);
+                    log('Invalid response timeout', 'warning');
+                }
+            });
+        }
+
+        // Settings: Size bounds (consolidated)
+        const applySizeLimits = () => {
+            mainContainer.style.minWidth = CONFIG.MIN_WIDTH + 'px';
+            mainContainer.style.minHeight = CONFIG.MIN_HEIGHT + 'px';
+            mainContainer.style.maxWidth = CONFIG.MAX_WIDTH + 'px';
+            mainContainer.style.maxHeight = CONFIG.MAX_HEIGHT + 'px';
+        };
+
+        // Data-driven size input handlers
+        const sizeInputs = [
+            { id: 'min-width-input', configKey: 'MIN_WIDTH', storageKey: STORAGE_KEYS.configMinWidth, min: 200, max: 1200 },
+            { id: 'min-height-input', configKey: 'MIN_HEIGHT', storageKey: STORAGE_KEYS.configMinHeight, min: 120, max: 1200 },
+            { id: 'max-width-input', configKey: 'MAX_WIDTH', storageKey: STORAGE_KEYS.configMaxWidth, min: 200, max: 2000 },
+            { id: 'max-height-input', configKey: 'MAX_HEIGHT', storageKey: STORAGE_KEYS.configMaxHeight, min: 120, max: 2000 }
+        ];
+
+        sizeInputs.forEach(({ id, configKey, storageKey, min, max }) => {
+            const element = document.getElementById(id);
+            if (element) {
+                element.addEventListener('change', (e) => {
+                    const v = parseInt(e.target.value);
+                    if (!Number.isNaN(v) && v >= min && v <= max) {
+                        CONFIG[configKey] = v;
+                        saveToStorage(storageKey, v);
+                        applySizeLimits();
+                    } else {
+                        e.target.value = String(CONFIG[configKey]);
+                    }
+                });
+            }
+        });
+
+        // Settings: default visible
+        const defVisEl = document.getElementById('default-visible-checkbox');
+        if (defVisEl) defVisEl.addEventListener('change', (e) => {
+            CONFIG.DEFAULT_VISIBLE = !!e.target.checked;
+            try { GM_setValue(STORAGE_KEYS.configDefaultVisible, CONFIG.DEFAULT_VISIBLE); } catch {}
+            log(`Default visibility ${CONFIG.DEFAULT_VISIBLE ? 'ON' : 'OFF'}`);
         });
     };
 
@@ -1927,21 +2157,21 @@ if (response.includes('error')) {
                 const show = mainContainer.style.display === 'none';
                 mainContainer.style.display = show ? 'block' : 'none';
                 uiVisible = show;
-                saveUIState();
+                saveUIState(true); // Immediate save for user action
             }
         },
         show: () => {
             if (mainContainer) {
                 mainContainer.style.display = 'block';
                 uiVisible = true;
-                saveUIState();
+                saveUIState(true); // Immediate save for user action
             }
         },
         hide: () => {
             if (mainContainer) {
                 mainContainer.style.display = 'none';
                 uiVisible = false;
-                saveUIState();
+                saveUIState(true); // Immediate save for user action
             }
         }
     };
