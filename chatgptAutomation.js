@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ChatGPT Automation Pro
 // @namespace    http://tampermonkey.net/
-// @version      1.5
+// @version      1.6
 // @description  Advanced ChatGPT automation with dynamic templating
 // @author       Henry Russell
 // @match        https://chatgpt.com/*
@@ -61,6 +61,7 @@
         waitTime: 'batchWaitTime',
         activeTab: 'activeTab',
         uiState: 'uiState',
+        logHeight: 'logContentHeight',
         // Config keys
         configDebug: 'config.debugMode',
         configTimeout: 'config.responseTimeout',
@@ -954,8 +955,15 @@
                 display: block !important;
             }
             #chatgpt-automation-ui.minimized .log-content {
-                max-height: 200px;
+                height: 120px;
+                min-height: 80px;
+                max-height: 400px;
                 overflow-y: auto;
+                resize: vertical;
+                border-bottom: 2px solid var(--border-light, rgba(0,0,0,0.1));
+            }
+            #chatgpt-automation-ui.dark-mode.minimized .log-content {
+                border-bottom-color: var(--border-light, rgba(255,255,255,0.1));
             }
             #chatgpt-automation-ui.minimized .automation-header {
                 position: sticky;
@@ -1568,6 +1576,15 @@
             const tabBtn = document.querySelector(`.tab-btn[data-tab="${savedTab}"]`);
             if (tabBtn) tabBtn.click();
 
+            // Restore saved log content height
+            const savedLogHeight = parseInt(GM_getValue(STORAGE_KEYS.logHeight, 120));
+            if (!Number.isNaN(savedLogHeight)) {
+                const logContent = document.querySelector('.log-content');
+                if (logContent) {
+                    logContent.style.height = `${savedLogHeight}px`;
+                }
+            }
+
             // Config - apply saved values and reflect in UI
             const dbgVal = !!GM_getValue(STORAGE_KEYS.configDebug, CONFIG.DEBUG_MODE);
             CONFIG.DEBUG_MODE = dbgVal;
@@ -1668,6 +1685,9 @@
         mountHeaderLauncher();
         startHeaderObserver();
         log('UI initialized successfully');
+        
+        // Auto-resize container to fit initial content
+        setTimeout(() => autoResizeContainer(), 200);
     };
 
     // Header launcher utilities
@@ -1752,6 +1772,62 @@
         statusIndicator.querySelector('.status-text').textContent = statusTexts[status] || 'Unknown';
     };
 
+    // Auto-resize container to fit content
+    const autoResizeContainer = () => {
+        if (!mainContainer || isMinimized) return;
+
+        try {
+            // Get the automation content container
+            const contentContainer = document.querySelector('#automation-content');
+            if (!contentContainer) return;
+
+            // Temporarily remove height constraints to measure natural height
+            const originalHeight = mainContainer.style.height;
+            const originalMaxHeight = mainContainer.style.maxHeight;
+            
+            mainContainer.style.height = 'auto';
+            mainContainer.style.maxHeight = 'none';
+
+            // Force layout recalculation
+            contentContainer.style.height = 'auto';
+            
+            // Wait for next frame to get accurate measurements
+            requestAnimationFrame(() => {
+                const contentHeight = contentContainer.scrollHeight;
+                const headerHeight = 60; // Header height
+                const logHeaderHeight = 45; // Log header when visible
+                const padding = 20; // Some padding
+                
+                let targetHeight = contentHeight + headerHeight + padding;
+                
+                // Add log header height if log is visible
+                const logContainer = document.getElementById('log-container');
+                if (logContainer && logContainer.style.display !== 'none') {
+                    targetHeight += logHeaderHeight;
+                }
+
+                // Apply min/max constraints
+                targetHeight = Math.max(targetHeight, CONFIG.MIN_HEIGHT);
+                targetHeight = Math.min(targetHeight, CONFIG.MAX_HEIGHT);
+
+                // Apply the calculated height
+                mainContainer.style.height = `${targetHeight}px`;
+                mainContainer.style.maxHeight = `${CONFIG.MAX_HEIGHT}px`;
+                
+                // Reset content container height
+                contentContainer.style.height = '';
+                
+                log(`Container auto-resized to ${targetHeight}px`);
+            });
+
+        } catch (error) {
+            // Restore original height on error
+            if (originalHeight) mainContainer.style.height = originalHeight;
+            if (originalMaxHeight) mainContainer.style.maxHeight = originalMaxHeight;
+            log(`Auto-resize error: ${error.message}`, 'warning');
+        }
+    };
+
     const bindEvents = () => {
         // Tab switching
         document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -1765,6 +1841,9 @@
                 // Update active tab content
                 document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
                 document.getElementById(`${tabName}-tab`).classList.add('active');
+
+                // Auto-resize container to fit new content
+                setTimeout(() => autoResizeContainer(), 100);
 
                 // Persist active tab
                 saveToStorage(STORAGE_KEYS.activeTab, tabName);
@@ -1890,6 +1969,9 @@
             } else {
                 logElement.style.display = 'none';
             }
+            
+            // Auto-resize container after log visibility change
+            setTimeout(() => autoResizeContainer(), 100);
         });
 
         // Clear log button
@@ -1897,6 +1979,25 @@
             logContainer.innerHTML = '';
             log('Log cleared');
         });
+
+        // Save log content height when user resizes it
+        const logContent = document.querySelector('.log-content');
+        if (logContent) {
+            let resizeTimeout;
+            const resizeObserver = new ResizeObserver((entries) => {
+                for (const entry of entries) {
+                    clearTimeout(resizeTimeout);
+                    resizeTimeout = setTimeout(() => {
+                        const height = Math.round(entry.contentRect.height);
+                        if (height >= 80 && height <= 400) { // Within our constraints
+                            saveToStorage(STORAGE_KEYS.logHeight, height);
+                            log(`Log height saved: ${height}px`);
+                        }
+                    }, 500); // Debounce to avoid excessive saves during dragging
+                }
+            });
+            resizeObserver.observe(logContent);
+        }
 
         // Toggle auto-scroll button
         document.getElementById('toggle-auto-scroll-btn').addEventListener('click', () => {
@@ -1924,6 +2025,8 @@
                 mainContainer.classList.add('minimized');
             } else {
                 mainContainer.classList.remove('minimized');
+                // Auto-resize when restoring from minimized state
+                setTimeout(() => autoResizeContainer(), 100);
             }
             saveUIState(true); // Immediate save for user action
         });
