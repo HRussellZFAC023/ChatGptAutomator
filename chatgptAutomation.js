@@ -27,8 +27,8 @@
         RESPONSE_TIMEOUT: 3000000, // 5 minutes
         MIN_WIDTH: 300,
         MIN_HEIGHT: 200,
-        MAX_WIDTH: 600,
-        MAX_HEIGHT: 800,
+        MAX_WIDTH: 1000,
+        MAX_HEIGHT: 1200,
         DEFAULT_VISIBLE: false
     };
 
