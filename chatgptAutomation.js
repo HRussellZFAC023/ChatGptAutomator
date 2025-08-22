@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ChatGPT Automation Pro
 // @namespace    http://tampermonkey.net/
-// @version      1.6
+// @version      1.7
 // @description  Advanced ChatGPT automation with dynamic templating
 // @author       Henry Russell
 // @match        https://chatgpt.com/*
@@ -61,7 +61,6 @@
         waitTime: 'batchWaitTime',
         activeTab: 'activeTab',
         uiState: 'uiState',
-        logHeight: 'logContentHeight',
         // Config keys
         configDebug: 'config.debugMode',
         configTimeout: 'config.responseTimeout',
@@ -97,7 +96,7 @@
             logEntry.className = `log-entry log-${type}`;
             logEntry.textContent = logMessage;
             logContainer.appendChild(logEntry);
-            
+
             // Auto-scroll logs if enabled
             if (autoScrollLogs) {
                 logContainer.scrollTop = logContainer.scrollHeight;
@@ -148,7 +147,7 @@
         }),
         postForm: (url, formObj, extraHeaders = {}) => {
             const body = Object.entries(formObj || {})
-                .map(([k,v]) => encodeURIComponent(k) + '=' + encodeURIComponent(String(v)))
+                .map(([k, v]) => encodeURIComponent(k) + '=' + encodeURIComponent(String(v)))
                 .join('&');
             return http.request({
                 method: 'POST', url,
@@ -187,17 +186,17 @@
 
             // Debug logging to help troubleshoot
             if (CONFIG.DEBUG_MODE) {
-                log(`Custom code context: item=${item ? JSON.stringify(item).slice(0,100) : 'null'}, index=${index}, total=${total}`);
+                log(`Custom code context: item=${item ? JSON.stringify(item).slice(0, 100) : 'null'}, index=${index}, total=${total}`);
             }
 
             // Create and execute the user function, properly awaiting any returned promise
             // Handle both regular code and async IIFE patterns
             let result;
-            
+
             // Check if the code is wrapped in an async IIFE pattern
             const asyncIIFEPattern = /^\s*\(\s*async\s*\(\s*\)\s*=>\s*\{[\s\S]*\}\s*\)\s*\(\s*\)\s*;?\s*$/;
             const isAsyncIIFE = asyncIIFEPattern.test(code.trim());
-            
+
             if (isAsyncIIFE) {
                 // For async IIFE, execute directly and the result will be a Promise
                 log('Detected async IIFE pattern, executing with proper await...');
@@ -224,7 +223,7 @@
                     http
                 );
             }
-            
+
             // Properly await the result whether it's a promise or not
             await Promise.resolve(result);
             log('Custom code executed successfully');
@@ -292,14 +291,14 @@
 
     // Storage helper to reduce repetitive try-catch blocks
     const saveToStorage = (key, value) => {
-        try { GM_setValue(key, value); } catch {}
+        try { GM_setValue(key, value); } catch { }
     };
 
     // Save UI state (simplified with debouncing)
     let saveTimeout;
     const saveUIState = (immediate = false) => {
         if (!mainContainer) return;
-        
+
         const doSave = () => {
             const state = {
                 left: mainContainer.style.left,
@@ -340,7 +339,7 @@
     const startNewChat = async () => {
         try {
             log('Starting new chat...');
-            
+
             // Method 1: Try the "New chat" button (language independent, uses data-testid)
             const newChatButton = document.querySelector('a[data-testid="create-new-chat-button"]');
             if (newChatButton) {
@@ -349,7 +348,7 @@
                 await sleep(1000);
                 return true;
             }
-                        
+
             const homeLink = document.querySelector('a[href="/"]');
             if (homeLink && homeLink.textContent.trim() !== '') {
                 log('Using home link...');
@@ -357,25 +356,25 @@
                 await sleep(1000);
                 return true;
             }
-            
+
             log('Using programmatic navigation...');
             const currentUrl = window.location.href;
             const baseUrl = window.location.origin;
-            
+
             // Only navigate if we're not already on the home page
             if (currentUrl !== baseUrl && currentUrl !== baseUrl + '/') {
                 // Use history.pushState to avoid full page reload
                 window.history.pushState({}, '', '/');
-                
+
                 // Trigger a popstate event to simulate navigation
                 window.dispatchEvent(new PopStateEvent('popstate'));
                 await sleep(1500);
                 return true;
             }
-            
+
             log('Already on home page or all methods failed', 'warning');
             return false;
-            
+
         } catch (error) {
             log(`Error starting new chat: ${error.message}`, 'error');
             return false;
@@ -569,7 +568,7 @@
                     elementData: element,
                     index: index + 1
                 }));
-                
+
                 if (CONFIG.DEBUG_MODE) {
                     log(`Processing ${messagesToProcess.length} elements. First element: ${JSON.stringify(dynamicElements[0])}`);
                 }
@@ -579,7 +578,7 @@
 
             for (let i = 0; i < messagesToProcess.length; i++) {
                 const { message: processedMessage, customCode: code, elementData, index } = messagesToProcess[i];
-                
+
                 updateProgress(i + 1, messagesToProcess.length);
 
                 if (isTemplate) {
@@ -627,7 +626,7 @@
                         // Execute custom code if provided
                         if (code && code.trim() !== '') {
                             if (isTemplate) {
-                                try { log(`Custom code context -> index: ${index ?? 'null'}/${messagesToProcess.length}, item: ${elementData ? JSON.stringify(elementData).slice(0,200) : 'null'}`); } catch { /* no-op */ }
+                                try { log(`Custom code context -> index: ${index ?? 'null'}/${messagesToProcess.length}, item: ${elementData ? JSON.stringify(elementData).slice(0, 200) : 'null'}`); } catch { /* no-op */ }
                             }
                             log('Executing custom code...');
                             await executeCustomCode(code, responseText, {
@@ -652,7 +651,7 @@
                     } catch (itemError) {
                         retryCount++;
                         log(`Error processing item ${index} (attempt ${retryCount}): ${itemError.message}`, 'error');
-                        
+
                         if (retryCount > maxRetries) {
                             log(`Item ${index} failed after ${maxRetries} retries, skipping...`, 'error');
                         }
@@ -940,30 +939,29 @@
             }
             
             #chatgpt-automation-ui.minimized { 
-                resize: none; 
-                height: auto !important;
-                min-height: auto !important;
+                /* Keep panel fully resizable when minimized */
+                resize: both;
+                /* Do not override height in minimized mode; user controls size */
             }
             #chatgpt-automation-ui.minimized .automation-content {
-                max-height: 250px;
+                /* Fill space under header and allow log to manage its own scrolling */
+                height: calc(100% - 60px);
+                display: flex;
+                flex-direction: column;
             }
             #chatgpt-automation-ui.minimized .progress-container,
             #chatgpt-automation-ui.minimized .automation-form { 
                 display: none; 
             }
             #chatgpt-automation-ui.minimized .automation-log { 
-                display: block !important;
+                display: flex !important;
+                flex-direction: column;
+                height: 100%;
             }
             #chatgpt-automation-ui.minimized .log-content {
-                height: 120px;
-                min-height: 80px;
-                max-height: 400px;
+                /* Let logs fill available space and scroll internally */
+                flex: 1 1 auto;
                 overflow-y: auto;
-                resize: vertical;
-                border-bottom: 2px solid var(--border-light, rgba(0,0,0,0.1));
-            }
-            #chatgpt-automation-ui.dark-mode.minimized .log-content {
-                border-bottom-color: var(--border-light, rgba(255,255,255,0.1));
             }
             #chatgpt-automation-ui.minimized .automation-header {
                 position: sticky;
@@ -1576,15 +1574,6 @@
             const tabBtn = document.querySelector(`.tab-btn[data-tab="${savedTab}"]`);
             if (tabBtn) tabBtn.click();
 
-            // Restore saved log content height
-            const savedLogHeight = parseInt(GM_getValue(STORAGE_KEYS.logHeight, 120));
-            if (!Number.isNaN(savedLogHeight)) {
-                const logContent = document.querySelector('.log-content');
-                if (logContent) {
-                    logContent.style.height = `${savedLogHeight}px`;
-                }
-            }
-
             // Config - apply saved values and reflect in UI
             const dbgVal = !!GM_getValue(STORAGE_KEYS.configDebug, CONFIG.DEBUG_MODE);
             CONFIG.DEBUG_MODE = dbgVal;
@@ -1622,7 +1611,7 @@
             CONFIG.DEFAULT_VISIBLE = defVis;
             const dvEl = document.getElementById('default-visible-checkbox');
             if (dvEl) dvEl.checked = defVis;
-        } catch {}
+        } catch { }
 
         // Load saved state
         const savedState = loadUIState();
@@ -1685,7 +1674,7 @@
         mountHeaderLauncher();
         startHeaderObserver();
         log('UI initialized successfully');
-        
+
         // Auto-resize container to fit initial content
         setTimeout(() => autoResizeContainer(), 200);
     };
@@ -1784,22 +1773,22 @@
             // Temporarily remove height constraints to measure natural height
             const originalHeight = mainContainer.style.height;
             const originalMaxHeight = mainContainer.style.maxHeight;
-            
+
             mainContainer.style.height = 'auto';
             mainContainer.style.maxHeight = 'none';
 
             // Force layout recalculation
             contentContainer.style.height = 'auto';
-            
+
             // Wait for next frame to get accurate measurements
             requestAnimationFrame(() => {
                 const contentHeight = contentContainer.scrollHeight;
                 const headerHeight = 60; // Header height
                 const logHeaderHeight = 45; // Log header when visible
                 const padding = 20; // Some padding
-                
+
                 let targetHeight = contentHeight + headerHeight + padding;
-                
+
                 // Add log header height if log is visible
                 const logContainer = document.getElementById('log-container');
                 if (logContainer && logContainer.style.display !== 'none') {
@@ -1813,10 +1802,10 @@
                 // Apply the calculated height
                 mainContainer.style.height = `${targetHeight}px`;
                 mainContainer.style.maxHeight = `${CONFIG.MAX_HEIGHT}px`;
-                
+
                 // Reset content container height
                 contentContainer.style.height = '';
-                
+
                 log(`Container auto-resized to ${targetHeight}px`);
             });
 
@@ -1958,7 +1947,7 @@
                 GM_setValue(STORAGE_KEYS.templateInput, '');
                 GM_setValue(STORAGE_KEYS.dynamicElementsInput, '');
                 GM_setValue(STORAGE_KEYS.loop, false);
-            } catch {}
+            } catch { }
         });
 
         // Toggle log button
@@ -1969,7 +1958,7 @@
             } else {
                 logElement.style.display = 'none';
             }
-            
+
             // Auto-resize container after log visibility change
             setTimeout(() => autoResizeContainer(), 100);
         });
@@ -1980,40 +1969,21 @@
             log('Log cleared');
         });
 
-        // Save log content height when user resizes it
-        const logContent = document.querySelector('.log-content');
-        if (logContent) {
-            let resizeTimeout;
-            const resizeObserver = new ResizeObserver((entries) => {
-                for (const entry of entries) {
-                    clearTimeout(resizeTimeout);
-                    resizeTimeout = setTimeout(() => {
-                        const height = Math.round(entry.contentRect.height);
-                        if (height >= 80 && height <= 400) { // Within our constraints
-                            saveToStorage(STORAGE_KEYS.logHeight, height);
-                            log(`Log height saved: ${height}px`);
-                        }
-                    }, 500); // Debounce to avoid excessive saves during dragging
-                }
-            });
-            resizeObserver.observe(logContent);
-        }
-
         // Toggle auto-scroll button
         document.getElementById('toggle-auto-scroll-btn').addEventListener('click', () => {
             autoScrollLogs = !autoScrollLogs;
-            
+
             const btn = document.getElementById('toggle-auto-scroll-btn');
             btn.style.opacity = autoScrollLogs ? '1' : '0.5';
             btn.title = autoScrollLogs ? 'Auto-scroll: ON' : 'Auto-scroll: OFF';
-            
+
             log(`Auto-scroll logs: ${autoScrollLogs ? 'enabled' : 'disabled'}`);
-            
+
             // If enabling auto-scroll, scroll to bottom immediately
             if (autoScrollLogs && logContainer) {
                 logContainer.scrollTop = logContainer.scrollHeight;
             }
-            
+
             // Save state to storage
             saveToStorage(STORAGE_KEYS.autoScroll, autoScrollLogs);
         });
@@ -2113,7 +2083,7 @@ if (response.includes('error')) {
     }
 }`;
             customCodeInput.value = template;
-            try { GM_setValue(STORAGE_KEYS.customCodeInput, customCodeInput.value); } catch {}
+            try { GM_setValue(STORAGE_KEYS.customCodeInput, customCodeInput.value); } catch { }
         });
 
         // Keyboard shortcuts
@@ -2277,7 +2247,7 @@ if (response.includes('error')) {
         const defVisEl = document.getElementById('default-visible-checkbox');
         if (defVisEl) defVisEl.addEventListener('change', (e) => {
             CONFIG.DEFAULT_VISIBLE = !!e.target.checked;
-            try { GM_setValue(STORAGE_KEYS.configDefaultVisible, CONFIG.DEFAULT_VISIBLE); } catch {}
+            try { GM_setValue(STORAGE_KEYS.configDefaultVisible, CONFIG.DEFAULT_VISIBLE); } catch { }
             log(`Default visibility ${CONFIG.DEFAULT_VISIBLE ? 'ON' : 'OFF'}`);
         });
     };
