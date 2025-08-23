@@ -2,7 +2,7 @@
 // ==UserScript==
 // @name         ChatGPT Automation Pro
 // @namespace    http://tampermonkey.net/
-// @version      1.7
+// @version      1.8
 // @description  Advanced ChatGPT automation with dynamic templating
 // @author       Henry Russell
 // @match        https://chatgpt.com/*
@@ -57,10 +57,6 @@
 
     // Storage keys
     const STORAGE_KEYS = {
-        messageInput: 'messageInput',
-        templateInput: 'templateInput',
-        dynamicElementsInput: 'dynamicElementsInput',
-        customCodeInput: 'customCodeInput',
         loop: 'looping',
         autoRemove: 'autoRemoveProcessed',
         newChat: 'newChatPerItem',
@@ -87,10 +83,6 @@
 
     // UI Elements
     let mainContainer = null;
-    let messageInput = null;
-    let customCodeInput = null;
-    let templateInput = null;
-    let dynamicElementsInput = null;
     let statusIndicator = null;
     let logContainer = null;
     let progressBar = null;
@@ -214,22 +206,6 @@
             let item = templateData?.elementData ?? null;
             let index = templateData?.index ?? null;
             let total = templateData?.total ?? null;
-
-            // Fallback: if item is missing and the Dynamic Elements input contains exactly one element,
-            // use it so custom code depending on { item } can still run outside Template mode.
-            if (!item && dynamicElementsInput && typeof dynamicElementsInput.value === 'string' && dynamicElementsInput.value.trim()) {
-                try {
-                    const arr = await parseDynamicElements(dynamicElementsInput.value.trim());
-                    if (Array.isArray(arr) && arr.length === 1) {
-                        item = arr[0];
-                        if (index == null) index = 1;
-                        if (total == null) total = 1;
-                        log('Context fallback applied: using single dynamic element for custom code');
-                    } else if (Array.isArray(arr) && arr.length > 1 && CONFIG.DEBUG_MODE) {
-                        log('Context note: multiple dynamic elements detected but Template mode is off; no auto-selection applied', 'warning');
-                    }
-                } catch { /* ignore fallback errors */ }
-            }
 
             // Debug logging to help troubleshoot
             if (CONFIG.DEBUG_MODE) {
@@ -428,21 +404,6 @@
         }
     };
 
-    // Function to update dynamic elements in real-time
-    const updateDynamicElementsDisplay = (remainingElements) => {
-        if (dynamicElementsInput && autoRemoveProcessed) {
-            try {
-                const newValue = JSON.stringify(remainingElements, null, 2);
-                dynamicElementsInput.value = newValue;
-                // Persist queue text so we can resume after refresh
-                GM_setValue(STORAGE_KEYS.dynamicElementsInput, newValue);
-                log(`Updated queue: ${remainingElements.length} items remaining`);
-            } catch (error) {
-                log(`Error updating display: ${error.message}`, 'warning');
-            }
-        }
-    };
-
     // ChatGPT interaction functions
     const getChatInput = () => {
         const selectors = [
@@ -624,8 +585,8 @@
 
                 if (isTemplate) {
                     // Re-read current template so edits mid-batch take effect
-                    const currentTemplate = (templateInput && typeof templateInput.value === 'string') ? templateInput.value.trim() : message;
-                    processedMessage = processDynamicTemplate(currentTemplate || message, {
+                    const currentTemplate = message;
+                    processedMessage = processDynamicTemplate(currentTemplate, {
                         item: elementData,
                         index: index,
                         total: messagesToProcess.length
@@ -692,7 +653,6 @@
                             const idx = dynamicElements.indexOf(elementData);
                             if (idx >= 0) {
                                 dynamicElements.splice(idx, 1);
-                                updateDynamicElementsDisplay(dynamicElements);
                             }
                         }
 
@@ -801,44 +761,13 @@
 
         <div class="automation-form">
                     <div class="tab-container">
-                        <button class="tab-btn active" data-tab="simple">Simple</button>
-                        <button class="tab-btn" data-tab="template">Template</button>
-            <button class="tab-btn" data-tab="chain">Chain</button>
-                        <button class="tab-btn" data-tab="advanced">Response (JS)</button>
+                        <button class="tab-btn active" data-tab="composer">Composer</button>
                         <button class="tab-btn" data-tab="settings">Settings</button>
                     </div>
 
-                    <div class="tab-content active" id="simple-tab">
+                    <div class="tab-content active" id="composer-tab">
                         <div class="form-group">
-                            <label for="message-input">Message:</label>
-                            <textarea id="message-input" placeholder="Enter your message for ChatGPT..." rows="3"></textarea>
-                        </div>
-                    </div>
-
-                    <div class="tab-content" id="template-tab">
-                        <div class="form-group">
-                            <label for="template-input">Message Template:</label>
-                            <textarea id="template-input" placeholder="Template with placeholders like {{item}}, {{index}}, {{total}} or {item.name}..." rows="3"></textarea>
-                            <div class="help-text">Use {{item}} / {item}, {{index}} / {index}, {{total}} / {total}. Nested paths supported, e.g. {item.name} or {{item.orderId}}</div>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="dynamic-elements-input">Dynamic Elements (JSON array or function):</label>
-                            <div class="code-editor">
-                                <textarea id="dynamic-elements-input" placeholder='["item1", "item2", "item3"] or () => ["generated", "items"]' rows="4"></textarea>
-                                <div class="editor-tools">
-                                    <button class="tool-btn" id="format-json-btn" title="Format JSON">{ }</button>
-                                    <button class="tool-btn" id="validate-elements-btn" title="Validate">✓</button>
-                                    <button class="tool-btn" id="elements-syntax-check-btn" title="Check JS">JS</button>
-                                    <button class="tool-btn" id="elements-insert-fn-btn" title="Insert Snippet">📝</button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="tab-content" id="chain-tab">
-                        <div class="form-group">
-                            <label>Chain Canvas:</label>
+                            <label>Composer Canvas:</label>
                             <div id="chain-canvas" class="chain-canvas">
                                 <div class="chain-toolbar">
                                     <button class="btn btn-secondary" id="add-step-btn">Add Step</button>
@@ -847,34 +776,16 @@
                                 </div>
                                 <div id="chain-cards" class="chain-cards"></div>
                             </div>
-                            <div class="help-text">Visual editor for multi-step chains. Steps connect in sequence; supports nested sub-batches.</div>
+                            <div class="help-text">Composer builds multi-step automations linked in sequence.</div>
                         </div>
                         <div class="form-group">
                             <label for="chain-json-input">Chain JSON (advanced):</label>
                             <div class="code-editor">
-                                <textarea id="chain-json-input" rows="6" placeholder='{"entryId":"step-1","steps":[{"id":"step-1","type":"prompt","title":"Create mnemonic","template":"...","next":"step-2"},{"id":"step-2","type":"prompt","title":"Create image prompt","template":"...","next":"step-3"},{"id":"step-3","type":"js","title":"Send to server","code":"// use http.postForm(...)"}]}'></textarea>
+                                <textarea id="chain-json-input" rows="6" placeholder='{"entryId":"step-1","steps":[{"id":"step-1","type":"simple","title":"Greet","template":"Hello"},{"id":"step-2","type":"http","title":"Notify","url":"https://...","method":"POST"},{"id":"step-3","type":"response","title":"Custom JS","code":"// your code"}]}'></textarea>
                                 <div class="editor-tools">
                                     <button class="tool-btn" id="format-chain-json-btn" title="Format JSON">{ }</button>
                                 </div>
                             </div>
-                        </div>
-                    </div>
-
-                    <div class="tab-content" id="advanced-tab">
-                        <div class="form-group">
-                            <label for="custom-code-input">Custom Code (JavaScript):</label>
-                            <div class="code-editor">
-                                <textarea id="custom-code-input" placeholder="// Custom code to run after response (optional)
-// Available variables: response, log, console, item, index, total, http
-// http: cross-origin helper (GM_xmlhttpRequest)
-//   await http.postForm('https://api.example.com/submit', { foo: 'bar' })
-// Example: log('Response length: ' + response.length);" rows="6"></textarea>
-                                <div class="editor-tools">
-                                    <button class="tool-btn" id="syntax-check-btn" title="Check Syntax">JS</button>
-                                    <button class="tool-btn" id="insert-template-btn" title="Insert Template">📝</button>
-                                </div>
-                            </div>
-                            <div class="help-text">Runs your JavaScript after ChatGPT finishes. Use <code>response</code> (string), <code>log()</code>, and <code>http</code> (CORS-capable) to integrate with any website's API.</div>
                         </div>
                     </div>
 
@@ -980,16 +891,6 @@
                         </div>
                     </div>
 
-                    <div class="form-actions">
-                        <button id="send-btn" class="btn btn-primary">
-                            <span class="btn-text">Send Message</span>
-                            <span class="btn-loader" style="display: none;">
-                                <div class="spinner"></div>
-                            </span>
-                        </button>
-                        <button id="clear-btn" class="btn btn-secondary">Clear</button>
-                        <button id="toggle-log-btn" class="btn btn-secondary">Toggle Log</button>
-                    </div>
                 </div>
 
                 <div class="automation-log" id="log-container">
@@ -1026,15 +927,19 @@
                         <div class="form-group">
                             <label for="step-type-select">Type</label>
                             <select id="step-type-select" class="settings-input">
-                                <option value="prompt">prompt</option>
+                                <option value="simple">simple</option>
                                 <option value="http">http</option>
-                                <option value="js">js</option>
-                                <option value="subbatch">subbatch</option>
+                                <option value="response">response</option>
+                                <option value="template">template</option>
                             </select>
                         </div>
-                        <div class="form-group" data-field="template">
-                            <label for="step-template-input">Template</label>
-                            <textarea id="step-template-input" rows="4" class="settings-input" placeholder="Message template (supports {item.*})"></textarea>
+                        <div class="form-group" data-field="message">
+                            <label id="step-message-label" for="step-template-input">Message</label>
+                            <textarea id="step-template-input" rows="4" class="settings-input" placeholder="Message"></textarea>
+                        </div>
+                        <div class="form-group" data-field="elements">
+                            <label for="step-elements-input">Dynamic Elements (JSON array or function)</label>
+                            <textarea id="step-elements-input" rows="3" class="settings-input" placeholder='["item1", "item2"]'></textarea>
                         </div>
                         <div class="form-group" data-field="http">
                             <label>HTTP</label>
@@ -1045,13 +950,9 @@
                             </div>
                             <textarea id="step-http-body" rows="3" class="settings-input" placeholder="Body template (optional)"></textarea>
                         </div>
-                        <div class="form-group" data-field="code">
+                        <div class="form-group" data-field="response">
                             <label for="step-js-code">JS Code</label>
                             <textarea id="step-js-code" rows="6" class="settings-input" placeholder="// code has access to response, item, index, total, http, log"></textarea>
-                        </div>
-                        <div class="form-group" data-field="subbatch">
-                            <label for="step-subbatch-path">Sub-batch source path (in context)</label>
-                            <input id="step-subbatch-path" class="settings-input" placeholder="e.g., item.parts or results[]">
                         </div>
                         <div class="form-group">
                             <label for="step-next-select">Next step</label>
@@ -1121,7 +1022,6 @@
                 height: 100%;
             }
             #chatgpt-automation-ui.minimized #log-container {
-                max-height: 48px;
                 overflow: hidden;
             }
             #chatgpt-automation-ui.minimized .log-content {
@@ -1194,10 +1094,10 @@
             }
 
             #chatgpt-automation-ui .automation-content {
-                max-height: calc(100% - 60px);
+                height: calc(100% - 60px);
                 display: flex;
                 flex-direction: column;
-                overflow: hidden;
+                overflow: auto;
                 -webkit-overflow-scrolling: touch;
             }
 
@@ -1578,11 +1478,10 @@
 
             #chatgpt-automation-ui .automation-log {
                 border-top: 1px solid var(--border-light, rgba(0,0,0,0.06));
-                max-height: 220px;
-                min-height: 120px;
-                overflow: hidden;
+                flex: 1 1 auto;
                 display: flex;
                 flex-direction: column;
+                overflow: hidden;
             }
 
             #chatgpt-automation-ui.dark-mode .automation-log {
@@ -1726,10 +1625,6 @@
         document.body.appendChild(mainContainer);
 
         // Get UI elements
-        messageInput = document.getElementById('message-input');
-        customCodeInput = document.getElementById('custom-code-input');
-        templateInput = document.getElementById('template-input');
-        dynamicElementsInput = document.getElementById('dynamic-elements-input');
         statusIndicator = document.getElementById('status-indicator');
     logContainer = document.querySelector('.log-content');
         progressBar = document.getElementById('progress-container');
@@ -1737,13 +1632,6 @@
 
     // Restore saved inputs, toggles and config
         try {
-            // Textareas
-            messageInput.value = GM_getValue(STORAGE_KEYS.messageInput, '') || '';
-            templateInput.value = GM_getValue(STORAGE_KEYS.templateInput, '') || '';
-            const savedDyn = GM_getValue(STORAGE_KEYS.dynamicElementsInput, '');
-            if (typeof savedDyn === 'string') dynamicElementsInput.value = savedDyn;
-            customCodeInput.value = GM_getValue(STORAGE_KEYS.customCodeInput, '') || '';
-
             // Checkboxes and switches
             const loopEl = document.getElementById('loop-checkbox');
             const autoRemoveEl = document.getElementById('auto-remove-checkbox');
@@ -2067,87 +1955,6 @@
             });
         });
 
-    // Send button
-        document.getElementById('send-btn').addEventListener('click', async () => {
-            const activeTab = document.querySelector('.tab-btn.active').dataset.tab;
-            const sendBtn = document.getElementById('send-btn');
-            const btnText = sendBtn.querySelector('.btn-text');
-            const btnLoader = sendBtn.querySelector('.btn-loader');
-
-            let message = '';
-            let customCode = customCodeInput.value.trim();
-            let isTemplate = false;
-
-            if (activeTab === 'simple') {
-                message = messageInput.value.trim();
-            } else if (activeTab === 'template') {
-                message = templateInput.value.trim();
-                isTemplate = true;
-
-                // Parse dynamic elements
-                const elementsInput = dynamicElementsInput.value.trim();
-                if (elementsInput) {
-                    dynamicElements = await parseDynamicElements(elementsInput);
-                    if (!Array.isArray(dynamicElements) || dynamicElements.length === 0) {
-                        log('No valid dynamic elements found', 'warning');
-                        return;
-                    }
-                }
-
-                // Check if batch processing is enabled
-                isLooping = document.getElementById('loop-checkbox').checked;
-                if (isLooping) {
-                    document.getElementById('stop-batch-btn').style.display = 'inline-block';
-                }
-            } else if (activeTab === 'chain') {
-                // Run the chain using dynamic elements as batch context
-                const chainInput = document.getElementById('chain-json-input');
-                try {
-                    const chain = JSON.parse(chainInput.value.trim());
-                    chainDefinition = chain;
-                    saveToStorage(STORAGE_KEYS.chainDef, chainInput.value.trim());
-                } catch (e) {
-                    log('Invalid Chain JSON: ' + e.message, 'error');
-                    return;
-                }
-
-                // Parse dynamic elements
-                const elementsInput = dynamicElementsInput.value.trim();
-                if (elementsInput) {
-                    dynamicElements = await parseDynamicElements(elementsInput);
-                } else {
-                    dynamicElements = [];
-                }
-
-                await runChainWithBatch();
-                return; // handled by chain engine
-            } else {
-                message = messageInput.value.trim() || templateInput.value.trim();
-            }
-
-            if (!message) {
-                log('Please enter a message', 'warning');
-                return;
-            }
-
-            // Update button state
-            sendBtn.disabled = true;
-            btnText.style.display = 'none';
-            btnLoader.style.display = 'inline-flex';
-
-            try {
-                await processMessage(message, customCode, isTemplate);
-            } finally {
-                sendBtn.disabled = false;
-                btnText.style.display = 'inline';
-                btnLoader.style.display = 'none';
-
-                if (!isLooping) {
-                    document.getElementById('stop-batch-btn').style.display = 'none';
-                }
-            }
-        });
-
     // Stop batch button
         document.getElementById('stop-batch-btn').addEventListener('click', () => {
             stopBatchProcessing();
@@ -2179,43 +1986,6 @@
                 e.target.value = batchWaitTime;
                 log('Invalid wait time, keeping current value', 'warning');
             }
-        });
-
-        // Clear button
-        document.getElementById('clear-btn').addEventListener('click', () => {
-            messageInput.value = '';
-            customCodeInput.value = '';
-            templateInput.value = '';
-            dynamicElementsInput.value = '';
-            document.getElementById('loop-checkbox').checked = false;
-            log('Form cleared');
-
-            // Persist cleared state
-            try {
-                GM_setValue(STORAGE_KEYS.messageInput, '');
-                GM_setValue(STORAGE_KEYS.customCodeInput, '');
-                GM_setValue(STORAGE_KEYS.templateInput, '');
-                GM_setValue(STORAGE_KEYS.dynamicElementsInput, '');
-                GM_setValue(STORAGE_KEYS.loop, false);
-            } catch { }
-        });
-
-        // Toggle log button
-        document.getElementById('toggle-log-btn').addEventListener('click', () => {
-            const logElement = document.getElementById('log-container');
-            // Instead of fully hiding, toggle between compact and expanded heights
-            const compact = logElement.dataset.compact === 'true';
-            logElement.dataset.compact = (!compact).toString();
-            if (compact) {
-                logElement.style.maxHeight = '220px';
-                log('Log expanded');
-            } else {
-                logElement.style.maxHeight = '120px';
-                log('Log compact');
-            }
-
-            // Auto-resize container after log visibility change
-            setTimeout(() => autoResizeContainer(), 100);
         });
 
         // Clear log button
@@ -2279,94 +2049,8 @@
             log('UI closed');
         });
 
-        // Tool buttons
-        document.getElementById('format-json-btn').addEventListener('click', () => {
-            try {
-                const input = dynamicElementsInput.value.trim();
-                if (input.startsWith('[')) {
-                    const parsed = JSON.parse(input);
-                    dynamicElementsInput.value = JSON.stringify(parsed, null, 2);
-                    log('JSON formatted');
-                    saveToStorage(STORAGE_KEYS.dynamicElementsInput, dynamicElementsInput.value);
-                }
-            } catch (error) {
-                log('Invalid JSON format', 'warning');
-            }
-        });
-
-        document.getElementById('validate-elements-btn').addEventListener('click', async () => {
-            const elements = await parseDynamicElements(dynamicElementsInput.value.trim());
-            if (Array.isArray(elements) && elements.length > 0) {
-                log(`Valid! Found ${elements.length} elements: ${JSON.stringify(elements.slice(0, 3))}${elements.length > 3 ? '...' : ''}`, 'info');
-            } else {
-                log('No valid elements found', 'warning');
-            }
-        });
-
-        // Template tab JS check and snippet
-        const elSyntaxBtn = document.getElementById('elements-syntax-check-btn');
-        if (elSyntaxBtn) {
-            elSyntaxBtn.addEventListener('click', async () => {
-                const code = dynamicElementsInput.value.trim();
-                if (!code) return log('Nothing to check', 'warning');
-                try {
-                    // Attempt to parse expression in userscript context
-                    new Function('return ( ' + code + ' )');
-                    log('Dynamic elements JS syntax is valid', 'info');
-                } catch (err) {
-                    log(`Syntax error: ${err.message}`, 'error');
-                }
-            });
-        }
-        const elSnippetBtn = document.getElementById('elements-insert-fn-btn');
-        if (elSnippetBtn) {
-            elSnippetBtn.addEventListener('click', () => {
-                const sample = `() => [
-  { name: "soup", orderId: "123" },
-  { name: "salad", orderId: "124" }
-]`;
-                dynamicElementsInput.value = sample;
-                log('Inserted sample dynamic elements function');
-            });
-        }
-
-        document.getElementById('syntax-check-btn').addEventListener('click', async () => {
-            try {
-                new Function(customCodeInput.value);
-                log('Syntax is valid', 'info');
-            } catch (error) {
-                log(`Syntax error: ${error.message}`, 'error');
-            }
-        });
-
-        document.getElementById('insert-template-btn').addEventListener('click', () => {
-            const template = `// Example custom code template
-if (response.includes('error')) {
-    log('Detected error in response', 'warning');
-} else {
-    log('Response looks good: ' + response.length + ' characters');
-
-    // Extract specific information
-    const matches = response.match(/\\d+/g);
-    if (matches) {
-        log('Found numbers: ' + matches.join(', '));
-    }
-}`;
-            customCodeInput.value = template;
-            try { GM_setValue(STORAGE_KEYS.customCodeInput, customCodeInput.value); } catch { }
-        });
-
         // Keyboard shortcuts
         document.addEventListener('keydown', (e) => {
-            // Ctrl/Cmd + Enter to send
-            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-                if ([messageInput, customCodeInput, templateInput, dynamicElementsInput].includes(document.activeElement)) {
-                    document.getElementById('send-btn').click();
-                    e.preventDefault();
-                }
-            }
-
-            // Escape to minimize
             if (e.key === 'Escape' && mainContainer.contains(document.activeElement)) {
                 document.getElementById('minimize-btn').click();
                 e.preventDefault();
@@ -2436,17 +2120,7 @@ if (response.includes('error')) {
             }
         });
 
-        // Consolidated input persistence
-        const persistInputs = [
-            { element: messageInput, key: STORAGE_KEYS.messageInput },
-            { element: templateInput, key: STORAGE_KEYS.templateInput },
-            { element: dynamicElementsInput, key: STORAGE_KEYS.dynamicElementsInput },
-            { element: customCodeInput, key: STORAGE_KEYS.customCodeInput }
-        ];
-
-        persistInputs.forEach(({ element, key }) => {
-            element.addEventListener('input', () => saveToStorage(key, element.value));
-        });
+        // (removed input persistence for legacy fields)
 
         // Persist loop checkbox when used
         const loopEl = document.getElementById('loop-checkbox');
@@ -2539,9 +2213,19 @@ if (response.includes('error')) {
                     <div class="meta">type: ${step.type}${step.next ? ` → ${step.next}` : ''}</div>
                     <div class="actions">
                         <button class="btn btn-secondary btn-sm" data-action="edit">Edit</button>
+                        <button class="btn btn-danger btn-sm" data-action="delete">Delete</button>
                     </div>
                 `;
                 card.querySelector('[data-action="edit"]').addEventListener('click', () => openStepEditor(step.id));
+                card.querySelector('[data-action="delete"]').addEventListener('click', () => {
+                    let chain;
+                    try { chain = JSON.parse(chainInput.value || '{}'); } catch { chain = { steps: [] }; }
+                    chain.steps = (chain.steps||[]).filter(s=>s.id!==step.id);
+                    chain.steps.forEach(s=>{ if (s.next === step.id) s.next = ''; });
+                    chainInput.value = JSON.stringify(chain, null, 2);
+                    saveToStorage(STORAGE_KEYS.chainDef, chainInput.value);
+                    refreshChainCards();
+                });
                 chainCards.appendChild(card);
             });
         };
@@ -2552,7 +2236,7 @@ if (response.includes('error')) {
             if (!Array.isArray(chain.steps)) chain.steps = [];
             let step = chain.steps.find(s => s.id === stepId);
             if (!step) {
-                step = { id: stepId || `step-${Date.now()}`, type: 'prompt', title: '', template: '' };
+                step = { id: stepId || `step-${Date.now()}`, type: 'simple', title: '', template: '' };
                 chain.steps.push(step);
             }
             const modal = document.getElementById('chain-step-modal');
@@ -2561,14 +2245,14 @@ if (response.includes('error')) {
             // Populate fields
             document.getElementById('step-id-input').value = step.id || '';
             document.getElementById('step-title-input').value = step.title || '';
-            document.getElementById('step-type-select').value = step.type || 'prompt';
+            document.getElementById('step-type-select').value = step.type || 'simple';
             document.getElementById('step-template-input').value = step.template || '';
+            document.getElementById('step-elements-input').value = step.elements || '';
             document.getElementById('step-http-url').value = step.url || '';
             document.getElementById('step-http-method').value = (step.method || 'GET').toUpperCase();
             document.getElementById('step-http-headers').value = step.headers ? JSON.stringify(step.headers) : '';
             document.getElementById('step-http-body').value = step.bodyTemplate || '';
             document.getElementById('step-js-code').value = step.code || '';
-            document.getElementById('step-subbatch-path').value = step.path || '';
             const nextSel = document.getElementById('step-next-select');
             nextSel.innerHTML = '<option value="">(end)</option>';
             (chain.steps||[]).forEach(s => {
@@ -2578,11 +2262,12 @@ if (response.includes('error')) {
 
             const onTypeChange = () => {
                 const type = document.getElementById('step-type-select').value;
-                // Toggle field groups
-                modal.querySelectorAll('[data-field="template"]').forEach(el => el.style.display = type === 'prompt' ? 'block' : 'none');
+                modal.querySelectorAll('[data-field="message"]').forEach(el => el.style.display = (type === 'simple' || type === 'template') ? 'block' : 'none');
+                modal.querySelectorAll('[data-field="elements"]').forEach(el => el.style.display = type === 'template' ? 'block' : 'none');
                 modal.querySelectorAll('[data-field="http"]').forEach(el => el.style.display = type === 'http' ? 'block' : 'none');
-                modal.querySelectorAll('[data-field="code"]').forEach(el => el.style.display = type === 'js' ? 'block' : 'none');
-                modal.querySelectorAll('[data-field="subbatch"]').forEach(el => el.style.display = type === 'subbatch' ? 'block' : 'none');
+                modal.querySelectorAll('[data-field="response"]').forEach(el => el.style.display = type === 'response' ? 'block' : 'none');
+                const label = document.getElementById('step-message-label');
+                if (label) label.textContent = type === 'template' ? 'Message Template' : 'Message';
             };
             document.getElementById('step-type-select').onchange = onTypeChange;
             onTypeChange();
@@ -2610,12 +2295,12 @@ if (response.includes('error')) {
                 step.title = document.getElementById('step-title-input').value.trim();
                 step.type = document.getElementById('step-type-select').value;
                 step.template = document.getElementById('step-template-input').value;
+                step.elements = document.getElementById('step-elements-input').value;
                 step.url = document.getElementById('step-http-url').value.trim();
                 step.method = document.getElementById('step-http-method').value.trim();
                 step.headers = (()=>{ try{ const v = document.getElementById('step-http-headers').value.trim(); return v? JSON.parse(v): undefined;}catch{return undefined;}})();
                 step.bodyTemplate = document.getElementById('step-http-body').value;
                 step.code = document.getElementById('step-js-code').value;
-                step.path = document.getElementById('step-subbatch-path').value.trim();
                 step.next = document.getElementById('step-next-select').value;
                 chainInput.value = JSON.stringify(chain, null, 2);
                 saveToStorage(STORAGE_KEYS.chainDef, chainInput.value);
@@ -2630,7 +2315,11 @@ if (response.includes('error')) {
             try { chain = JSON.parse(chainInput.value || '{}'); } catch { chain = {}; }
             if (!chain.steps) chain.steps = [];
             const id = `step-${(chain.steps.length||0)+1}`;
-            chain.steps.push({ id, title: `Step ${chain.steps.length+1}`, type: 'prompt', template: '' });
+            chain.steps.push({ id, title: `Step ${chain.steps.length+1}`, type: 'simple', template: '' });
+            if (chain.steps.length > 1) {
+                const prev = chain.steps[chain.steps.length-2];
+                if (prev && !prev.next) prev.next = id;
+            }
             if (!chain.entryId) chain.entryId = id;
             chainInput.value = JSON.stringify(chain, null, 2);
             saveToStorage(STORAGE_KEYS.chainDef, chainInput.value);
@@ -2653,10 +2342,6 @@ if (response.includes('error')) {
 
         const runChainBtn = document.getElementById('run-chain-btn');
         if (runChainBtn) runChainBtn.addEventListener('click', async () => {
-            // Mirror Send button behavior for chain
-            const elementsInput = dynamicElementsInput.value.trim();
-            if (elementsInput) dynamicElements = await parseDynamicElements(elementsInput);
-            else dynamicElements = [];
             await runChainWithBatch();
         });
 
@@ -2690,14 +2375,14 @@ if (response.includes('error')) {
             try { const sel = document.getElementById(selId); const map = GM_getValue(storeKey, {}) || {}; const v = map[sel.value]; if (v==null) return; apply(v); log('Preset loaded'); } catch(e){ log('Load failed: '+e.message, 'error'); }
         };
         loadPresetSelects();
-        document.getElementById('save-template-preset-btn')?.addEventListener('click', ()=> savePreset(STORAGE_KEYS.presetsTemplates, getPresetName(), templateInput.value||''));
-        document.getElementById('load-template-preset-btn')?.addEventListener('click', ()=> loadPreset(STORAGE_KEYS.presetsTemplates, 'load-template-select', v=>{ templateInput.value=v; saveToStorage(STORAGE_KEYS.templateInput, v);}));
+        document.getElementById('save-template-preset-btn')?.addEventListener('click', ()=> savePreset(STORAGE_KEYS.presetsTemplates, getPresetName(), document.getElementById('step-template-input')?.value||''));
+        document.getElementById('load-template-preset-btn')?.addEventListener('click', ()=> loadPreset(STORAGE_KEYS.presetsTemplates, 'load-template-select', v=>{ const el=document.getElementById('step-template-input'); if(el){ el.value=v; }}));
         document.getElementById('delete-template-preset-btn')?.addEventListener('click', ()=> deletePreset(STORAGE_KEYS.presetsTemplates, 'load-template-select'));
         document.getElementById('save-chain-preset-btn')?.addEventListener('click', ()=> savePreset(STORAGE_KEYS.presetsChains, getPresetName(), document.getElementById('chain-json-input').value||''));
         document.getElementById('load-chain-preset-btn')?.addEventListener('click', ()=> loadPreset(STORAGE_KEYS.presetsChains, 'load-chain-select', v=>{ document.getElementById('chain-json-input').value=v; saveToStorage(STORAGE_KEYS.chainDef, v); }));
         document.getElementById('delete-chain-preset-btn')?.addEventListener('click', ()=> deletePreset(STORAGE_KEYS.presetsChains, 'load-chain-select'));
-        document.getElementById('save-js-preset-btn')?.addEventListener('click', ()=> savePreset(STORAGE_KEYS.presetsResponseJS, getPresetName(), customCodeInput.value||''));
-        document.getElementById('load-js-preset-btn')?.addEventListener('click', ()=> loadPreset(STORAGE_KEYS.presetsResponseJS, 'load-js-select', v=>{ customCodeInput.value=v; saveToStorage(STORAGE_KEYS.customCodeInput, v);}));
+        document.getElementById('save-js-preset-btn')?.addEventListener('click', ()=> savePreset(STORAGE_KEYS.presetsResponseJS, getPresetName(), document.getElementById('step-js-code')?.value||''));
+        document.getElementById('load-js-preset-btn')?.addEventListener('click', ()=> loadPreset(STORAGE_KEYS.presetsResponseJS, 'load-js-select', v=>{ const el=document.getElementById('step-js-code'); if(el){ el.value=v; }}));
         document.getElementById('delete-js-preset-btn')?.addEventListener('click', ()=> deletePreset(STORAGE_KEYS.presetsResponseJS, 'load-js-select'));
     };
 
@@ -2743,21 +2428,8 @@ if (response.includes('error')) {
 
         isProcessing = true; updateStatus('processing');
         try {
-            const items = Array.isArray(dynamicElements) ? dynamicElements : [];
-            const total = Math.max(1, items.length || 1);
-            if (items.length === 0) {
-                // Single run with empty item
-                await processChain(chainDefinition, { item: null, index: 1, total });
-            } else {
-                for (let i = 0; i < items.length; i++) {
-                    const item = items[i];
-                    updateProgress(i+1, items.length);
-                    log(`🔗 Chain run for item ${i+1}/${items.length}`);
-                    await processChain(chainDefinition, { item, index: i+1, total: items.length });
-                    if (i < items.length - 1) { log(`⏱️ Waiting ${batchWaitTime}ms before next item…`); await sleep(batchWaitTime); }
-                }
-            }
-            log('🏁 Chain batch completed');
+            await processChain(chainDefinition, { item: null, index:1, total:1 });
+            log('🏁 Chain completed');
         } catch (e) {
             log('Chain error: ' + e.message, 'error');
         } finally {
@@ -2783,8 +2455,7 @@ if (response.includes('error')) {
 
         while (step) {
             log(`➡️ Step ${step.id} (${step.type})`);
-            if (step.type === 'prompt') {
-                // Render template and send
+            if (step.type === 'simple') {
                 const msg = processDynamicTemplate(step.template||'', { ...context, item: context.item, index: context.index, total: context.total });
                 await typeMessage(msg);
                 await sleep(300);
@@ -2806,21 +2477,26 @@ if (response.includes('error')) {
                 try { const j = JSON.parse(payload); payload = j; } catch { /* keep as text */ }
                 context.chain[step.id] = { http: { status: res.status, data: payload } };
                 log(`🌐 HTTP ${method} ${url} → ${res.status}`);
-            } else if (step.type === 'js') {
+            } else if (step.type === 'response') {
                 await executeCustomCode(step.code||'', context.lastResponseText || '', { elementData: context.item, index: context.index, total: context.total });
-            } else if (step.type === 'subbatch') {
-                // Expand items from a path in context
-                const getByPath = (obj, path) => { try { return path.split('.').reduce((a,p)=> a!=null ? a[p.replace(/\[|\]/g,'')] : undefined, obj); } catch { return undefined; } };
-                const arr = getByPath(context, step.path||'') || [];
+            } else if (step.type === 'template') {
+                const arr = await parseDynamicElements(step.elements||'');
                 if (Array.isArray(arr) && arr.length) {
                     for (let i=0;i<arr.length;i++) {
-                        const child = arr[i];
-                        log(`🧩 Sub-batch ${i+1}/${arr.length} via ${step.path}`);
-                        await processChain({ entryId: chain.entryId, steps: chain.steps }, { ...context, item: child, index: i+1, total: arr.length });
+                        const item = arr[i];
+                        const msg = processDynamicTemplate(step.template||'', { ...context, item, index:i+1, total:arr.length });
+                        await typeMessage(msg);
+                        await sleep(300);
+                        await sendMessage();
+                        updateStatus('waiting');
+                        const respEl = await waitForResponse();
+                        const resp = extractResponseText(respEl);
+                        context.lastResponseText = resp;
+                        context.chain[step.id] = { response: resp };
+                        log(`📩 Step ${step.id} item ${i+1} response (${resp.length} chars)`);
                     }
                 } else {
-                    log(`Sub-batch path yielded no items: ${step.path||'(none)'}
-                    `,'warning');
+                    log('Template step produced no items', 'warning');
                 }
             } else {
                 log(`Unknown step type: ${step.type}`, 'warning');
