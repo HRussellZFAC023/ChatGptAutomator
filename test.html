@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChatGPT Automator UI Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 20px;
+            background: #f6f6f6;
+        }
+        .test-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        h1, h2 {
+            color: #333;
+        }
+        .note {
+            background: #e3f2fd;
+            padding: 10px;
+            border-radius: 4px;
+            border-left: 4px solid #2196f3;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>ChatGPT Automator UI Test</h1>
+    
+    <div class="test-container">
+        <h2>Current Implementation</h2>
+        <p>This page will load the current ChatGPT Automator script and allow us to test UI changes visually.</p>
+        <div class="note">
+            <strong>Note:</strong> The script will be loaded in test mode to preview UI changes without ChatGPT functionality.
+        </div>
+        
+        <!-- Test area where the UI will be rendered -->
+        <div id="test-area">
+            <div id="page-header">
+                <div id="conversation-header-actions"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Mock ChatGPT page elements for testing
+        window.GM_setValue = window.GM_setValue || ((key, value) => localStorage.setItem('gm_' + key, JSON.stringify(value)));
+        window.GM_getValue = window.GM_getValue || ((key, defaultValue) => {
+            const stored = localStorage.getItem('gm_' + key);
+            return stored ? JSON.parse(stored) : defaultValue;
+        });
+
+        // Load the automation script for testing
+        const script = document.createElement('script');
+        script.src = 'chatgptAutomation.js';
+        script.onload = () => {
+            console.log('ChatGPT Automator loaded for testing');
+        };
+        script.onerror = () => {
+            console.error('Failed to load ChatGPT Automator script');
+        };
+        document.head.appendChild(script);
+    </script>
+</body>
+</html>
