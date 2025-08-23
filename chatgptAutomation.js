@@ -1927,9 +1927,6 @@
             attributeFilter: ['class', 'data-theme']
         });
 
-        // Add persistent header launcher
-        mountHeaderLauncher();
-        startHeaderObserver();
         log('UI initialized successfully');
 
     // Auto-resize container to fit initial content
@@ -1970,12 +1967,6 @@
         if (!target.querySelector('#chatgpt-automation-launcher')) {
             const btn = createLauncherButton();
             target.appendChild(btn);
-        }
-        // Also ensure the UI exists if it should be visible
-        const savedState = loadUIState();
-        const shouldShow = savedState.visible === true || CONFIG.DEFAULT_VISIBLE;
-        if (shouldShow && !document.getElementById('chatgpt-automation-ui')) {
-            createUI();
         }
         return true;
     };
@@ -2957,11 +2948,32 @@ if (response.includes('error')) {
 
         log('Initializing ChatGPT Automation Pro...');
 
+        // Always try to mount header launcher first
+        const mountLauncher = () => {
+            try {
+                mountHeaderLauncher();
+                startHeaderObserver();
+            } catch (e) {
+                console.error('Failed to mount header launcher:', e);
+            }
+        };
+
+        // Try to create full UI
+        const initUI = () => {
+            try {
+                createUI();
+            } catch (e) {
+                console.error('Failed to create main UI:', e);
+                // Even if main UI fails, ensure launcher is mounted
+                mountLauncher();
+            }
+        };
+
         // Wait for page to be ready
         if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', createUI);
+            document.addEventListener('DOMContentLoaded', initUI);
         } else {
-            createUI();
+            initUI();
         }
     };
 
