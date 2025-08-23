@@ -2,7 +2,7 @@
 // ==UserScript==
 // @name         ChatGPT Automation Pro
 // @namespace    http://tampermonkey.net/
-// @version      1.7
+// @version      1.8
 // @description  Advanced ChatGPT automation with dynamic templating
 // @author       Henry Russell
 // @match        https://chatgpt.com/*
@@ -807,7 +807,7 @@
 
                     <div class="tab-content active" id="chain-tab">
                         <div class="form-group">
-                            <label>Chain Canvas:</label>
+                            <label>Composer Canvas:</label>
                             <div id="chain-canvas" class="chain-canvas">
                                 <div class="chain-toolbar">
                                     <button class="btn btn-secondary" id="add-step-btn">Add Step</button>
@@ -816,7 +816,7 @@
                                 </div>
                                 <div id="chain-cards" class="chain-cards"></div>
                             </div>
-                            <div class="help-text">Visual editor for multi-step chains. Steps connect in sequence; supports nested sub-batches.</div>
+                            <div class="help-text">Visual editor for multi-step workflows. Create templates, automation chains, and custom responses.</div>
                         </div>
                         <div class="form-group">
                             <label for="chain-json-input">Chain JSON (advanced):</label>
