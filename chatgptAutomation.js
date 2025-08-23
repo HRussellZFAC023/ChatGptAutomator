@@ -801,27 +801,23 @@
 
         <div class="automation-form">
                     <div class="tab-container">
-                        <button class="tab-btn active" data-tab="simple">Simple</button>
-                        <button class="tab-btn" data-tab="template">Template</button>
-            <button class="tab-btn" data-tab="chain">Chain</button>
-                        <button class="tab-btn" data-tab="advanced">Response (JS)</button>
+                        <button class="tab-btn active" data-tab="composer">Composer</button>
                         <button class="tab-btn" data-tab="settings">Settings</button>
                     </div>
 
-                    <div class="tab-content active" id="simple-tab">
+                    <div class="tab-content active" id="composer-tab">
                         <div class="form-group">
-                            <label for="message-input">Message:</label>
-                            <textarea id="message-input" placeholder="Enter your message for ChatGPT..." rows="3"></textarea>
+                            <label>Composition Canvas:</label>
+                            <div id="chain-canvas" class="chain-canvas">
+                                <div class="chain-toolbar">
+                                    <button class="btn btn-secondary" id="add-step-btn">Add Step</button>
+                                    <button class="btn btn-secondary" id="validate-chain-btn">Validate Composition</button>
+                                    <button class="btn btn-primary" id="run-chain-btn">Run Composition</button>
+                                </div>
+                                <div id="chain-cards" class="chain-cards"></div>
+                            </div>
+                            <div class="help-text">Visual editor for multi-step compositions. Steps connect in sequence; supports templates and JavaScript.</div>
                         </div>
-                    </div>
-
-                    <div class="tab-content" id="template-tab">
-                        <div class="form-group">
-                            <label for="template-input">Message Template:</label>
-                            <textarea id="template-input" placeholder="Template with placeholders like {{item}}, {{index}}, {{total}} or {item.name}..." rows="3"></textarea>
-                            <div class="help-text">Use {{item}} / {item}, {{index}} / {index}, {{total}} / {total}. Nested paths supported, e.g. {item.name} or {{item.orderId}}</div>
-                        </div>
-
                         <div class="form-group">
                             <label for="dynamic-elements-input">Dynamic Elements (JSON array or function):</label>
                             <div class="code-editor">
@@ -834,23 +830,8 @@
                                 </div>
                             </div>
                         </div>
-                    </div>
-
-                    <div class="tab-content" id="chain-tab">
                         <div class="form-group">
-                            <label>Chain Canvas:</label>
-                            <div id="chain-canvas" class="chain-canvas">
-                                <div class="chain-toolbar">
-                                    <button class="btn btn-secondary" id="add-step-btn">Add Step</button>
-                                    <button class="btn btn-secondary" id="validate-chain-btn">Validate Chain</button>
-                                    <button class="btn btn-primary" id="run-chain-btn">Run Chain</button>
-                                </div>
-                                <div id="chain-cards" class="chain-cards"></div>
-                            </div>
-                            <div class="help-text">Visual editor for multi-step chains. Steps connect in sequence; supports nested sub-batches.</div>
-                        </div>
-                        <div class="form-group">
-                            <label for="chain-json-input">Chain JSON (advanced):</label>
+                            <label for="chain-json-input">Composition JSON (advanced):</label>
                             <div class="code-editor">
                                 <textarea id="chain-json-input" rows="6" placeholder='{"entryId":"step-1","steps":[{"id":"step-1","type":"prompt","title":"Create mnemonic","template":"...","next":"step-2"},{"id":"step-2","type":"prompt","title":"Create image prompt","template":"...","next":"step-3"},{"id":"step-3","type":"js","title":"Send to server","code":"// use http.postForm(...)"}]}'></textarea>
                                 <div class="editor-tools">
@@ -858,23 +839,21 @@
                                 </div>
                             </div>
                         </div>
-                    </div>
-
-                    <div class="tab-content" id="advanced-tab">
                         <div class="form-group">
-                            <label for="custom-code-input">Custom Code (JavaScript):</label>
-                            <div class="code-editor">
-                                <textarea id="custom-code-input" placeholder="// Custom code to run after response (optional)
-// Available variables: response, log, console, item, index, total, http
-// http: cross-origin helper (GM_xmlhttpRequest)
-//   await http.postForm('https://api.example.com/submit', { foo: 'bar' })
-// Example: log('Response length: ' + response.length);" rows="6"></textarea>
-                                <div class="editor-tools">
-                                    <button class="tool-btn" id="syntax-check-btn" title="Check Syntax">JS</button>
-                                    <button class="tool-btn" id="insert-template-btn" title="Insert Template">📝</button>
+                            <label>Presets:</label>
+                            <div class="presets-grid">
+                                <div class="preset-block">
+                                    <div class="preset-row">
+                                        <input type="text" id="composer-preset-name-input" class="settings-input" placeholder="Preset name">
+                                    </div>
+                                    <div class="preset-row">
+                                        <button class="btn btn-secondary" id="save-composition-preset-btn">Save Composition</button>
+                                        <select id="load-composition-select" class="settings-input"></select>
+                                        <button class="btn btn-primary" id="load-composition-preset-btn">Load</button>
+                                        <button class="btn btn-danger" id="delete-composition-preset-btn">Delete</button>
+                                    </div>
                                 </div>
                             </div>
-                            <div class="help-text">Runs your JavaScript after ChatGPT finishes. Use <code>response</code> (string), <code>log()</code>, and <code>http</code> (CORS-capable) to integrate with any website's API.</div>
                         </div>
                     </div>
 
@@ -950,34 +929,6 @@
                             </label>
                             <div class="help-text">Controls default visibility on page load. You can still toggle from the header button.</div>
                         </div>
-                        <div class="form-group">
-                            <label>Presets:</label>
-                            <div class="presets-grid">
-                                <div class="preset-block">
-                                    <div class="preset-row">
-                                        <input type="text" id="preset-name-input" class="settings-input" placeholder="Preset name">
-                                    </div>
-                                    <div class="preset-row">
-                                        <button class="btn btn-secondary" id="save-template-preset-btn">Save Template</button>
-                                        <select id="load-template-select" class="settings-input"></select>
-                                        <button class="btn btn-primary" id="load-template-preset-btn">Load</button>
-                                        <button class="btn btn-danger" id="delete-template-preset-btn">Delete</button>
-                                    </div>
-                                    <div class="preset-row">
-                                        <button class="btn btn-secondary" id="save-chain-preset-btn">Save Chain</button>
-                                        <select id="load-chain-select" class="settings-input"></select>
-                                        <button class="btn btn-primary" id="load-chain-preset-btn">Load</button>
-                                        <button class="btn btn-danger" id="delete-chain-preset-btn">Delete</button>
-                                    </div>
-                                    <div class="preset-row">
-                                        <button class="btn btn-secondary" id="save-js-preset-btn">Save Response JS</button>
-                                        <select id="load-js-select" class="settings-input"></select>
-                                        <button class="btn btn-primary" id="load-js-preset-btn">Load</button>
-                                        <button class="btn btn-danger" id="delete-js-preset-btn">Delete</button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
                     </div>
 
                     <div class="form-actions">
@@ -1026,33 +977,71 @@
                         <div class="form-group">
                             <label for="step-type-select">Type</label>
                             <select id="step-type-select" class="settings-input">
-                                <option value="prompt">prompt</option>
-                                <option value="http">http</option>
-                                <option value="js">js</option>
-                                <option value="subbatch">subbatch</option>
+                                <option value="simple">Simple</option>
+                                <option value="template">Template</option>
+                                <option value="response-js">Response (JS)</option>
+                                <option value="http">HTTP</option>
                             </select>
                         </div>
-                        <div class="form-group" data-field="template">
-                            <label for="step-template-input">Template</label>
-                            <textarea id="step-template-input" rows="4" class="settings-input" placeholder="Message template (supports {item.*})"></textarea>
+                        
+                        <!-- Simple section -->
+                        <div class="form-group" data-field="simple">
+                            <label for="step-simple-message">Message</label>
+                            <textarea id="step-simple-message" rows="3" class="settings-input" placeholder="Enter your message for ChatGPT..."></textarea>
+                            <div class="help-text">Direct message to send to ChatGPT</div>
                         </div>
+                        
+                        <!-- Template section -->
+                        <div class="form-group" data-field="template">
+                            <label for="step-template-input">Message Template</label>
+                            <textarea id="step-template-input" rows="4" class="settings-input" placeholder="Template with placeholders like {{item}}, {{index}}, {{total}} or {item.name}..."></textarea>
+                            <div class="help-text">Use {{item}} / {item}, {{index}} / {index}, {{total}} / {total}. Nested paths supported, e.g. {item.name} or {{item.orderId}}</div>
+                        </div>
+                        
+                        <!-- Response (JS) section -->
+                        <div class="form-group" data-field="response-js">
+                            <label for="step-response-js">Response JavaScript</label>
+                            <textarea id="step-response-js" rows="6" class="settings-input" placeholder="// Custom code to run after response (optional)
+// Available variables: response, log, console, item, index, total, http
+// Example: log('Response length: ' + response.length);"></textarea>
+                            <div class="help-text">Runs your JavaScript after ChatGPT finishes. Use <code>response</code> (string), <code>log()</code>, and <code>http</code> (CORS-capable) to integrate with any website's API.</div>
+                        </div>
+                        
+                        <!-- HTTP section -->
                         <div class="form-group" data-field="http">
-                            <label>HTTP</label>
-                            <input id="step-http-url" class="settings-input" placeholder="https://...">
-                            <div style="display:flex; gap:8px; margin-top:6px;">
+                            <label>HTTP Request</label>
+                            <input id="step-http-url" class="settings-input" placeholder="https://..." style="margin-bottom: 6px;">
+                            <div style="display:flex; gap:8px; margin-bottom:6px;">
                                 <select id="step-http-method" class="settings-input"><option>GET</option><option>POST</option><option>PUT</option><option>DELETE</option></select>
                                 <input id="step-http-headers" class="settings-input" placeholder='{"Content-Type":"application/json"}'>
                             </div>
                             <textarea id="step-http-body" rows="3" class="settings-input" placeholder="Body template (optional)"></textarea>
                         </div>
-                        <div class="form-group" data-field="code">
-                            <label for="step-js-code">JS Code</label>
-                            <textarea id="step-js-code" rows="6" class="settings-input" placeholder="// code has access to response, item, index, total, http, log"></textarea>
+                        
+                        <!-- Presets section -->
+                        <div class="form-group">
+                            <label>Presets</label>
+                            <div class="presets-grid">
+                                <div class="preset-block">
+                                    <div class="preset-row">
+                                        <input type="text" id="step-preset-name-input" class="settings-input" placeholder="Preset name">
+                                    </div>
+                                    <div class="preset-row">
+                                        <button class="btn btn-secondary" id="save-template-preset-modal-btn">Save Template</button>
+                                        <select id="load-template-select-modal" class="settings-input"></select>
+                                        <button class="btn btn-primary" id="load-template-preset-modal-btn">Load</button>
+                                        <button class="btn btn-danger" id="delete-template-preset-modal-btn">Delete</button>
+                                    </div>
+                                    <div class="preset-row">
+                                        <button class="btn btn-secondary" id="save-js-preset-modal-btn">Save Response JS</button>
+                                        <select id="load-js-select-modal" class="settings-input"></select>
+                                        <button class="btn btn-primary" id="load-js-preset-modal-btn">Load</button>
+                                        <button class="btn btn-danger" id="delete-js-preset-modal-btn">Delete</button>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                        <div class="form-group" data-field="subbatch">
-                            <label for="step-subbatch-path">Sub-batch source path (in context)</label>
-                            <input id="step-subbatch-path" class="settings-input" placeholder="e.g., item.parts or results[]">
-                        </div>
+                        
                         <div class="form-group">
                             <label for="step-next-select">Next step</label>
                             <select id="step-next-select" class="settings-input"></select>
@@ -1669,6 +1658,31 @@
             #chatgpt-automation-ui .chain-card .title { font-weight:600; font-size:12px; margin-bottom:4px; }
             #chatgpt-automation-ui .chain-card .meta { font-size:11px; opacity:0.8; margin-bottom:6px; }
             #chatgpt-automation-ui .chain-card .actions { display:flex; gap:6px; }
+
+            /* Empty chain state */
+            #chatgpt-automation-ui .empty-chain-container {
+                width: 100%;
+                padding: 40px 20px;
+                text-align: center;
+                border: 2px dashed var(--border-light, rgba(0,0,0,0.2));
+                border-radius: 12px;
+                background: var(--surface-secondary, rgba(0,0,0,0.02));
+                color: var(--text-secondary, #6b7280);
+            }
+            #chatgpt-automation-ui.dark-mode .empty-chain-container {
+                background: var(--surface-secondary, rgba(255,255,255,0.02));
+                border-color: var(--border-light, rgba(255,255,255,0.2));
+            }
+            #chatgpt-automation-ui .empty-chain-container .empty-message {
+                font-size: 14px;
+                margin-bottom: 16px;
+                font-weight: 500;
+            }
+            #chatgpt-automation-ui .btn-lg {
+                padding: 12px 24px;
+                font-size: 14px;
+                font-weight: 600;
+            }
 
             /* Modal */
             #chatgpt-automation-ui .chain-modal { position: fixed; inset:0; z-index:10001; }
@@ -2529,7 +2543,31 @@ if (response.includes('error')) {
             chainCards.innerHTML = '';
             let chain;
             try { chain = JSON.parse(chainInput.value || '{}'); } catch { chain = null; }
-            if (!chain || !Array.isArray(chain.steps)) return;
+            
+            // Handle empty state
+            if (!chain || !Array.isArray(chain.steps) || chain.steps.length === 0) {
+                const emptyContainer = document.createElement('div');
+                emptyContainer.className = 'empty-chain-container';
+                emptyContainer.innerHTML = `
+                    <div class="empty-message">Start building your composition</div>
+                    <button class="btn btn-primary btn-lg" id="add-first-step-btn">Add First Step</button>
+                `;
+                chainCards.appendChild(emptyContainer);
+                
+                // Wire up the add first step button
+                document.getElementById('add-first-step-btn').addEventListener('click', () => {
+                    let newChain = { steps: [] };
+                    const id = 'step-1';
+                    newChain.steps.push({ id, title: 'Step 1', type: 'simple', template: '' });
+                    newChain.entryId = id;
+                    chainInput.value = JSON.stringify(newChain, null, 2);
+                    saveToStorage(STORAGE_KEYS.chainDef, chainInput.value);
+                    refreshChainCards();
+                    openStepEditor(id);
+                });
+                return;
+            }
+            
             chain.steps.forEach(step => {
                 const card = document.createElement('div');
                 card.className = 'chain-card';
@@ -2539,9 +2577,33 @@ if (response.includes('error')) {
                     <div class="meta">type: ${step.type}${step.next ? ` → ${step.next}` : ''}</div>
                     <div class="actions">
                         <button class="btn btn-secondary btn-sm" data-action="edit">Edit</button>
+                        <button class="btn btn-danger btn-sm" data-action="delete">Delete</button>
                     </div>
                 `;
+                
+                // Wire up edit button
                 card.querySelector('[data-action="edit"]').addEventListener('click', () => openStepEditor(step.id));
+                
+                // Wire up delete button
+                card.querySelector('[data-action="delete"]').addEventListener('click', () => {
+                    if (confirm(`Delete step "${step.title || step.id}"?`)) {
+                        // Remove step from chain
+                        chain.steps = chain.steps.filter(s => s.id !== step.id);
+                        // Update references to this step
+                        chain.steps.forEach(s => {
+                            if (s.next === step.id) s.next = '';
+                        });
+                        // Update entryId if it pointed to deleted step
+                        if (chain.entryId === step.id) {
+                            chain.entryId = chain.steps.length > 0 ? chain.steps[0].id : '';
+                        }
+                        chainInput.value = JSON.stringify(chain, null, 2);
+                        saveToStorage(STORAGE_KEYS.chainDef, chainInput.value);
+                        refreshChainCards();
+                        log(`Step "${step.title || step.id}" deleted`);
+                    }
+                });
+                
                 chainCards.appendChild(card);
             });
         };
@@ -2552,23 +2614,25 @@ if (response.includes('error')) {
             if (!Array.isArray(chain.steps)) chain.steps = [];
             let step = chain.steps.find(s => s.id === stepId);
             if (!step) {
-                step = { id: stepId || `step-${Date.now()}`, type: 'prompt', title: '', template: '' };
+                step = { id: stepId || `step-${Date.now()}`, type: 'simple', title: '', template: '' };
                 chain.steps.push(step);
             }
             const modal = document.getElementById('chain-step-modal');
             modal.style.display = 'block';
             modal.setAttribute('aria-hidden', 'false');
+            
             // Populate fields
             document.getElementById('step-id-input').value = step.id || '';
             document.getElementById('step-title-input').value = step.title || '';
-            document.getElementById('step-type-select').value = step.type || 'prompt';
+            document.getElementById('step-type-select').value = step.type || 'simple';
+            document.getElementById('step-simple-message').value = step.message || '';
             document.getElementById('step-template-input').value = step.template || '';
+            document.getElementById('step-response-js').value = step.code || '';
             document.getElementById('step-http-url').value = step.url || '';
             document.getElementById('step-http-method').value = (step.method || 'GET').toUpperCase();
             document.getElementById('step-http-headers').value = step.headers ? JSON.stringify(step.headers) : '';
             document.getElementById('step-http-body').value = step.bodyTemplate || '';
-            document.getElementById('step-js-code').value = step.code || '';
-            document.getElementById('step-subbatch-path').value = step.path || '';
+            
             const nextSel = document.getElementById('step-next-select');
             nextSel.innerHTML = '<option value="">(end)</option>';
             (chain.steps||[]).forEach(s => {
@@ -2576,17 +2640,20 @@ if (response.includes('error')) {
                 opt.value = s.id; opt.textContent = s.id; if (step.next === s.id) opt.selected = true; nextSel.appendChild(opt);
             });
 
+            // Show/hide relevant sections based on type
             const onTypeChange = () => {
                 const type = document.getElementById('step-type-select').value;
-                // Toggle field groups
-                modal.querySelectorAll('[data-field="template"]').forEach(el => el.style.display = type === 'prompt' ? 'block' : 'none');
+                modal.querySelectorAll('[data-field="simple"]').forEach(el => el.style.display = type === 'simple' ? 'block' : 'none');
+                modal.querySelectorAll('[data-field="template"]').forEach(el => el.style.display = type === 'template' ? 'block' : 'none');
+                modal.querySelectorAll('[data-field="response-js"]').forEach(el => el.style.display = type === 'response-js' ? 'block' : 'none');
                 modal.querySelectorAll('[data-field="http"]').forEach(el => el.style.display = type === 'http' ? 'block' : 'none');
-                modal.querySelectorAll('[data-field="code"]').forEach(el => el.style.display = type === 'js' ? 'block' : 'none');
-                modal.querySelectorAll('[data-field="subbatch"]').forEach(el => el.style.display = type === 'subbatch' ? 'block' : 'none');
             };
             document.getElementById('step-type-select').onchange = onTypeChange;
             onTypeChange();
 
+            // Attach modal preset handlers
+            attachModalPresetHandlers();
+            
             const saveBtn = document.getElementById('save-step-btn');
             const deleteBtn = document.getElementById('delete-step-btn');
             const closeBtn = document.getElementById('close-step-modal-btn');
@@ -2595,13 +2662,18 @@ if (response.includes('error')) {
             closeBtn.onclick = closeModal;
 
             deleteBtn.onclick = () => {
-                chain.steps = chain.steps.filter(s => s.id !== step.id);
-                // Remove references
-                chain.steps.forEach(s => { if (s.next === step.id) s.next = ''; });
-                chainInput.value = JSON.stringify(chain, null, 2);
-                saveToStorage(STORAGE_KEYS.chainDef, chainInput.value);
-                refreshChainCards();
-                closeModal();
+                if (confirm(`Delete step "${step.title || step.id}"?`)) {
+                    chain.steps = chain.steps.filter(s => s.id !== step.id);
+                    // Remove references
+                    chain.steps.forEach(s => { if (s.next === step.id) s.next = ''; });
+                    if (chain.entryId === step.id) {
+                        chain.entryId = chain.steps.length > 0 ? chain.steps[0].id : '';
+                    }
+                    chainInput.value = JSON.stringify(chain, null, 2);
+                    saveToStorage(STORAGE_KEYS.chainDef, chainInput.value);
+                    refreshChainCards();
+                    closeModal();
+                }
             };
 
             saveBtn.onclick = () => {
@@ -2609,13 +2681,13 @@ if (response.includes('error')) {
                 step.id = newId;
                 step.title = document.getElementById('step-title-input').value.trim();
                 step.type = document.getElementById('step-type-select').value;
+                step.message = document.getElementById('step-simple-message').value;
                 step.template = document.getElementById('step-template-input').value;
+                step.code = document.getElementById('step-response-js').value;
                 step.url = document.getElementById('step-http-url').value.trim();
                 step.method = document.getElementById('step-http-method').value.trim();
                 step.headers = (()=>{ try{ const v = document.getElementById('step-http-headers').value.trim(); return v? JSON.parse(v): undefined;}catch{return undefined;}})();
                 step.bodyTemplate = document.getElementById('step-http-body').value;
-                step.code = document.getElementById('step-js-code').value;
-                step.path = document.getElementById('step-subbatch-path').value.trim();
                 step.next = document.getElementById('step-next-select').value;
                 chainInput.value = JSON.stringify(chain, null, 2);
                 saveToStorage(STORAGE_KEYS.chainDef, chainInput.value);
@@ -2673,12 +2745,14 @@ if (response.includes('error')) {
         const loadPresetSelects = () => {
             const fill = (id, map) => { const sel = document.getElementById(id); if (!sel) return; sel.innerHTML = ''; Object.keys(map||{}).sort().forEach(name=>{ const o=document.createElement('option'); o.value=name; o.textContent=name; sel.appendChild(o); }); };
             try {
-                fill('load-template-select', GM_getValue(STORAGE_KEYS.presetsTemplates, {}));
-                fill('load-chain-select', GM_getValue(STORAGE_KEYS.presetsChains, {}));
-                fill('load-js-select', GM_getValue(STORAGE_KEYS.presetsResponseJS, {}));
+                // Composer tab presets
+                fill('load-composition-select', GM_getValue(STORAGE_KEYS.presetsChains, {}));
+                // Modal presets
+                fill('load-template-select-modal', GM_getValue(STORAGE_KEYS.presetsTemplates, {}));
+                fill('load-js-select-modal', GM_getValue(STORAGE_KEYS.presetsResponseJS, {}));
             } catch { }
         };
-        const getPresetName = () => (document.getElementById('preset-name-input')?.value||'').trim();
+        const getPresetName = (inputId) => (document.getElementById(inputId)?.value||'').trim();
         const savePreset = (storeKey, name, value) => {
             if (!name) return log('Enter a preset name', 'warning');
             try { const map = GM_getValue(storeKey, {}) || {}; map[name] = value; GM_setValue(storeKey, map); loadPresetSelects(); log('Preset saved'); } catch(e){ log('Save failed: '+e.message, 'error'); }
@@ -2690,15 +2764,21 @@ if (response.includes('error')) {
             try { const sel = document.getElementById(selId); const map = GM_getValue(storeKey, {}) || {}; const v = map[sel.value]; if (v==null) return; apply(v); log('Preset loaded'); } catch(e){ log('Load failed: '+e.message, 'error'); }
         };
         loadPresetSelects();
-        document.getElementById('save-template-preset-btn')?.addEventListener('click', ()=> savePreset(STORAGE_KEYS.presetsTemplates, getPresetName(), templateInput.value||''));
-        document.getElementById('load-template-preset-btn')?.addEventListener('click', ()=> loadPreset(STORAGE_KEYS.presetsTemplates, 'load-template-select', v=>{ templateInput.value=v; saveToStorage(STORAGE_KEYS.templateInput, v);}));
-        document.getElementById('delete-template-preset-btn')?.addEventListener('click', ()=> deletePreset(STORAGE_KEYS.presetsTemplates, 'load-template-select'));
-        document.getElementById('save-chain-preset-btn')?.addEventListener('click', ()=> savePreset(STORAGE_KEYS.presetsChains, getPresetName(), document.getElementById('chain-json-input').value||''));
-        document.getElementById('load-chain-preset-btn')?.addEventListener('click', ()=> loadPreset(STORAGE_KEYS.presetsChains, 'load-chain-select', v=>{ document.getElementById('chain-json-input').value=v; saveToStorage(STORAGE_KEYS.chainDef, v); }));
-        document.getElementById('delete-chain-preset-btn')?.addEventListener('click', ()=> deletePreset(STORAGE_KEYS.presetsChains, 'load-chain-select'));
-        document.getElementById('save-js-preset-btn')?.addEventListener('click', ()=> savePreset(STORAGE_KEYS.presetsResponseJS, getPresetName(), customCodeInput.value||''));
-        document.getElementById('load-js-preset-btn')?.addEventListener('click', ()=> loadPreset(STORAGE_KEYS.presetsResponseJS, 'load-js-select', v=>{ customCodeInput.value=v; saveToStorage(STORAGE_KEYS.customCodeInput, v);}));
-        document.getElementById('delete-js-preset-btn')?.addEventListener('click', ()=> deletePreset(STORAGE_KEYS.presetsResponseJS, 'load-js-select'));
+        
+        // Composer tab preset handlers
+        document.getElementById('save-composition-preset-btn')?.addEventListener('click', ()=> savePreset(STORAGE_KEYS.presetsChains, getPresetName('composer-preset-name-input'), document.getElementById('chain-json-input').value||''));
+        document.getElementById('load-composition-preset-btn')?.addEventListener('click', ()=> loadPreset(STORAGE_KEYS.presetsChains, 'load-composition-select', v=>{ document.getElementById('chain-json-input').value=v; saveToStorage(STORAGE_KEYS.chainDef, v); refreshChainCards(); }));
+        document.getElementById('delete-composition-preset-btn')?.addEventListener('click', ()=> deletePreset(STORAGE_KEYS.presetsChains, 'load-composition-select'));
+        
+        // Modal preset handlers (attached when modal opens)
+        const attachModalPresetHandlers = () => {
+            document.getElementById('save-template-preset-modal-btn')?.addEventListener('click', ()=> savePreset(STORAGE_KEYS.presetsTemplates, getPresetName('step-preset-name-input'), document.getElementById('step-template-input').value||''));
+            document.getElementById('load-template-preset-modal-btn')?.addEventListener('click', ()=> loadPreset(STORAGE_KEYS.presetsTemplates, 'load-template-select-modal', v=>{ document.getElementById('step-template-input').value=v; }));
+            document.getElementById('delete-template-preset-modal-btn')?.addEventListener('click', ()=> deletePreset(STORAGE_KEYS.presetsTemplates, 'load-template-select-modal'));
+            document.getElementById('save-js-preset-modal-btn')?.addEventListener('click', ()=> savePreset(STORAGE_KEYS.presetsResponseJS, getPresetName('step-preset-name-input'), document.getElementById('step-response-js').value||''));
+            document.getElementById('load-js-preset-modal-btn')?.addEventListener('click', ()=> loadPreset(STORAGE_KEYS.presetsResponseJS, 'load-js-select-modal', v=>{ document.getElementById('step-response-js').value=v; }));
+            document.getElementById('delete-js-preset-modal-btn')?.addEventListener('click', ()=> deletePreset(STORAGE_KEYS.presetsResponseJS, 'load-js-select-modal'));
+        };
     };
 
     // Run-lock utilities to avoid cross-tab collisions
