@@ -1,3 +1,4 @@
+
 // ==UserScript==
 // @name         ChatGPT Automation Pro
 // @namespace    http://tampermonkey.net/
@@ -29,7 +30,9 @@
         MIN_HEIGHT: 200,
         MAX_WIDTH: 1000,
         MAX_HEIGHT: 1200,
-        DEFAULT_VISIBLE: false
+    DEFAULT_VISIBLE: false,
+    RUN_LOCK_TTL_MS: 15000,
+    RUN_LOCK_RENEW_MS: 5000
     };
 
     // State management
@@ -47,6 +50,10 @@
     let autoRemoveProcessed = true; // Whether to remove processed items from textbox
     let autoScrollLogs = true; // Whether to auto-scroll logs
     let newChatPerItem = false; // Whether to start new chat for each item
+    // Chain state
+    let chainDefinition = null;
+    let runLockId = null;
+    let runLockTimer = null;
 
     // Storage keys
     const STORAGE_KEYS = {
@@ -61,6 +68,13 @@
         waitTime: 'batchWaitTime',
         activeTab: 'activeTab',
         uiState: 'uiState',
+        chainDef: 'chain.definition',
+        // presets
+        presetsTemplates: 'presets.templates', // object map name->template string
+        presetsChains: 'presets.chains',       // object map name->chain json
+        presetsResponseJS: 'presets.responseJS', // object map name->js string
+        logHistory: 'log.history',
+        runLockKey: 'chatgptAutomation.runLock',
         // Config keys
         configDebug: 'config.debugMode',
         configTimeout: 'config.responseTimeout',
@@ -91,7 +105,7 @@
             console.log(logMessage);
         }
 
-        if (logContainer) {
+    if (logContainer) {
             const logEntry = document.createElement('div');
             logEntry.className = `log-entry log-${type}`;
             logEntry.textContent = logMessage;
@@ -114,14 +128,24 @@
                 logContainer.scrollTop = logContainer.scrollHeight;
             }
 
-            // Keep only last 50 log entries
-            const maxEntries = 50;
+            // Keep only last 200 log entries
+            const maxEntries = 200;
             const entries = Array.from(logContainer.querySelectorAll('.log-entry'));
             while (entries.length > maxEntries) {
                 const first = entries.shift();
                 if (first && first.parentNode) first.parentNode.removeChild(first);
             }
         }
+
+        // Persist a rolling history so logs survive reloads
+        try {
+            const maxPersist = 300;
+            let history = GM_getValue(STORAGE_KEYS.logHistory, []);
+            if (!Array.isArray(history)) history = [];
+            history.push({ t: Date.now(), type, msg: logMessage });
+            if (history.length > maxPersist) history = history.slice(history.length - maxPersist);
+            GM_setValue(STORAGE_KEYS.logHistory, history);
+        } catch { /* ignore */ }
     };
 
     // Small helper to clip long strings for logging
@@ -766,7 +790,7 @@
                     </button>
                 </div>
             </div>
-            
+
             <div class="automation-content" id="automation-content">
                 <div class="progress-container" id="progress-container" style="display: none;">
                     <div class="progress-bar">
@@ -774,29 +798,30 @@
                     </div>
                     <div class="progress-text">0/0</div>
                 </div>
-                
-                <div class="automation-form">
+
+        <div class="automation-form">
                     <div class="tab-container">
                         <button class="tab-btn active" data-tab="simple">Simple</button>
                         <button class="tab-btn" data-tab="template">Template</button>
+            <button class="tab-btn" data-tab="chain">Chain</button>
                         <button class="tab-btn" data-tab="advanced">Response (JS)</button>
                         <button class="tab-btn" data-tab="settings">Settings</button>
                     </div>
-                    
+
                     <div class="tab-content active" id="simple-tab">
                         <div class="form-group">
                             <label for="message-input">Message:</label>
                             <textarea id="message-input" placeholder="Enter your message for ChatGPT..." rows="3"></textarea>
                         </div>
                     </div>
-                    
+
                     <div class="tab-content" id="template-tab">
                         <div class="form-group">
                             <label for="template-input">Message Template:</label>
                             <textarea id="template-input" placeholder="Template with placeholders like {{item}}, {{index}}, {{total}} or {item.name}..." rows="3"></textarea>
                             <div class="help-text">Use {{item}} / {item}, {{index}} / {index}, {{total}} / {total}. Nested paths supported, e.g. {item.name} or {{item.orderId}}</div>
                         </div>
-                        
+
                         <div class="form-group">
                             <label for="dynamic-elements-input">Dynamic Elements (JSON array or function):</label>
                             <div class="code-editor">
@@ -809,39 +834,32 @@
                                 </div>
                             </div>
                         </div>
-                        
-                        <div class="batch-controls">
-                            <div class="batch-settings">
-                                <label class="checkbox-label">
-                                    <input type="checkbox" id="loop-checkbox">
-                                    <span class="checkmark"></span>
-                                    Process all items in batch
-                                </label>
-                                
-                                <label class="checkbox-label">
-                                    <input type="checkbox" id="auto-remove-checkbox" checked>
-                                    <span class="checkmark"></span>
-                                    Remove processed items from queue
-                                </label>
-                                
-                                <label class="checkbox-label">
-                                    <input type="checkbox" id="new-chat-checkbox">
-                                    <span class="checkmark"></span>
-                                    Start new chat for each item
-                                </label>
-                                
-                                <div class="wait-time-control">
-                                    <label for="wait-time-input">Wait between items (ms):</label>
-                                    <input type="number" id="wait-time-input" min="100" max="30000" value="2000" step="100">
+                    </div>
+
+                    <div class="tab-content" id="chain-tab">
+                        <div class="form-group">
+                            <label>Chain Canvas:</label>
+                            <div id="chain-canvas" class="chain-canvas">
+                                <div class="chain-toolbar">
+                                    <button class="btn btn-secondary" id="add-step-btn">Add Step</button>
+                                    <button class="btn btn-secondary" id="validate-chain-btn">Validate Chain</button>
+                                    <button class="btn btn-primary" id="run-chain-btn">Run Chain</button>
                                 </div>
+                                <div id="chain-cards" class="chain-cards"></div>
                             </div>
-                            
-                            <div class="batch-actions">
-                                <button id="stop-batch-btn" class="btn btn-danger" style="display: none;">Stop Batch</button>
+                            <div class="help-text">Visual editor for multi-step chains. Steps connect in sequence; supports nested sub-batches.</div>
+                        </div>
+                        <div class="form-group">
+                            <label for="chain-json-input">Chain JSON (advanced):</label>
+                            <div class="code-editor">
+                                <textarea id="chain-json-input" rows="6" placeholder='{"entryId":"step-1","steps":[{"id":"step-1","type":"prompt","title":"Create mnemonic","template":"...","next":"step-2"},{"id":"step-2","type":"prompt","title":"Create image prompt","template":"...","next":"step-3"},{"id":"step-3","type":"js","title":"Send to server","code":"// use http.postForm(...)"}]}'></textarea>
+                                <div class="editor-tools">
+                                    <button class="tool-btn" id="format-chain-json-btn" title="Format JSON">{ }</button>
+                                </div>
                             </div>
                         </div>
                     </div>
-                    
+
                     <div class="tab-content" id="advanced-tab">
                         <div class="form-group">
                             <label for="custom-code-input">Custom Code (JavaScript):</label>
@@ -859,7 +877,7 @@
                             <div class="help-text">Runs your JavaScript after ChatGPT finishes. Use <code>response</code> (string), <code>log()</code>, and <code>http</code> (CORS-capable) to integrate with any website's API.</div>
                         </div>
                     </div>
-                    
+
                     <div class="tab-content" id="settings-tab">
                         <div class="form-group">
                             <label>Debug mode:</label>
@@ -868,6 +886,35 @@
                                 <span class="checkmark"></span>
                                 Enable debug logging
                             </label>
+                        </div>
+                        <div class="form-group">
+                            <label>Batch settings:</label>
+                            <div class="batch-controls">
+                                <div class="batch-settings">
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" id="loop-checkbox">
+                                        <span class="checkmark"></span>
+                                        Process all items in batch
+                                    </label>
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" id="auto-remove-checkbox" checked>
+                                        <span class="checkmark"></span>
+                                        Remove processed items from queue
+                                    </label>
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" id="new-chat-checkbox">
+                                        <span class="checkmark"></span>
+                                        Start new chat for each item
+                                    </label>
+                                    <div class="wait-time-control">
+                                        <label for="wait-time-input">Wait between items (ms):</label>
+                                        <input type="number" id="wait-time-input" min="100" max="30000" value="2000" step="100">
+                                    </div>
+                                </div>
+                                <div class="batch-actions">
+                                    <button id="stop-batch-btn" class="btn btn-danger" style="display: none;">Stop Batch</button>
+                                </div>
+                            </div>
                         </div>
                         <div class="form-group">
                             <label for="response-timeout-input">Response timeout (ms):</label>
@@ -903,8 +950,36 @@
                             </label>
                             <div class="help-text">Controls default visibility on page load. You can still toggle from the header button.</div>
                         </div>
+                        <div class="form-group">
+                            <label>Presets:</label>
+                            <div class="presets-grid">
+                                <div class="preset-block">
+                                    <div class="preset-row">
+                                        <input type="text" id="preset-name-input" class="settings-input" placeholder="Preset name">
+                                    </div>
+                                    <div class="preset-row">
+                                        <button class="btn btn-secondary" id="save-template-preset-btn">Save Template</button>
+                                        <select id="load-template-select" class="settings-input"></select>
+                                        <button class="btn btn-primary" id="load-template-preset-btn">Load</button>
+                                        <button class="btn btn-danger" id="delete-template-preset-btn">Delete</button>
+                                    </div>
+                                    <div class="preset-row">
+                                        <button class="btn btn-secondary" id="save-chain-preset-btn">Save Chain</button>
+                                        <select id="load-chain-select" class="settings-input"></select>
+                                        <button class="btn btn-primary" id="load-chain-preset-btn">Load</button>
+                                        <button class="btn btn-danger" id="delete-chain-preset-btn">Delete</button>
+                                    </div>
+                                    <div class="preset-row">
+                                        <button class="btn btn-secondary" id="save-js-preset-btn">Save Response JS</button>
+                                        <select id="load-js-select" class="settings-input"></select>
+                                        <button class="btn btn-primary" id="load-js-preset-btn">Load</button>
+                                        <button class="btn btn-danger" id="delete-js-preset-btn">Delete</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    
+
                     <div class="form-actions">
                         <button id="send-btn" class="btn btn-primary">
                             <span class="btn-text">Send Message</span>
@@ -916,8 +991,8 @@
                         <button id="toggle-log-btn" class="btn btn-secondary">Toggle Log</button>
                     </div>
                 </div>
-                
-                <div class="automation-log" id="log-container" style="display: none;">
+
+                <div class="automation-log" id="log-container">
                     <div class="log-header">
                         <span>Activity Log</span>
                         <div class="log-header-controls">
@@ -928,8 +1003,67 @@
                     <div class="log-content"></div>
                 </div>
             </div>
-            
+
             <div class="resize-handle" id="resize-handle"></div>
+
+            <!-- Modal for editing a chain step -->
+            <div id="chain-step-modal" class="chain-modal" aria-hidden="true" style="display:none;">
+                <div class="chain-modal-backdrop"></div>
+                <div class="chain-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="chain-step-title">
+                    <div class="chain-modal-header">
+                        <h4 id="chain-step-title">Edit Step</h4>
+                        <button class="header-btn" id="close-step-modal-btn" aria-label="Close">✕</button>
+                    </div>
+                    <div class="chain-modal-body">
+                        <div class="form-group">
+                            <label for="step-id-input">ID</label>
+                            <input id="step-id-input" class="settings-input" placeholder="step-1">
+                        </div>
+                        <div class="form-group">
+                            <label for="step-title-input">Title</label>
+                            <input id="step-title-input" class="settings-input" placeholder="Describe the step">
+                        </div>
+                        <div class="form-group">
+                            <label for="step-type-select">Type</label>
+                            <select id="step-type-select" class="settings-input">
+                                <option value="prompt">prompt</option>
+                                <option value="http">http</option>
+                                <option value="js">js</option>
+                                <option value="subbatch">subbatch</option>
+                            </select>
+                        </div>
+                        <div class="form-group" data-field="template">
+                            <label for="step-template-input">Template</label>
+                            <textarea id="step-template-input" rows="4" class="settings-input" placeholder="Message template (supports {item.*})"></textarea>
+                        </div>
+                        <div class="form-group" data-field="http">
+                            <label>HTTP</label>
+                            <input id="step-http-url" class="settings-input" placeholder="https://...">
+                            <div style="display:flex; gap:8px; margin-top:6px;">
+                                <select id="step-http-method" class="settings-input"><option>GET</option><option>POST</option><option>PUT</option><option>DELETE</option></select>
+                                <input id="step-http-headers" class="settings-input" placeholder='{"Content-Type":"application/json"}'>
+                            </div>
+                            <textarea id="step-http-body" rows="3" class="settings-input" placeholder="Body template (optional)"></textarea>
+                        </div>
+                        <div class="form-group" data-field="code">
+                            <label for="step-js-code">JS Code</label>
+                            <textarea id="step-js-code" rows="6" class="settings-input" placeholder="// code has access to response, item, index, total, http, log"></textarea>
+                        </div>
+                        <div class="form-group" data-field="subbatch">
+                            <label for="step-subbatch-path">Sub-batch source path (in context)</label>
+                            <input id="step-subbatch-path" class="settings-input" placeholder="e.g., item.parts or results[]">
+                        </div>
+                        <div class="form-group">
+                            <label for="step-next-select">Next step</label>
+                            <select id="step-next-select" class="settings-input"></select>
+                        </div>
+                    </div>
+                    <div class="chain-modal-footer">
+                        <button class="btn btn-secondary" id="delete-step-btn">Delete</button>
+                        <button class="btn btn-primary" id="save-step-btn">Save</button>
+                    </div>
+                </div>
+            </div>
         `;
 
         // Add styles with ChatGPT-inspired design (guard against duplicates)
@@ -959,14 +1093,14 @@
                 backdrop-filter: blur(10px);
                 transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             }
-            
+
             #chatgpt-automation-ui.dark-mode {
                 background: var(--main-surface-primary, #2d2d30);
                 border-color: var(--border-medium, rgba(255,255,255,0.1));
                 color: var(--text-primary, #ffffff);
             }
-            
-            #chatgpt-automation-ui.minimized { 
+
+            #chatgpt-automation-ui.minimized {
                 /* Keep panel fully resizable when minimized */
                 resize: both;
                 /* Do not override height in minimized mode; user controls size */
@@ -978,10 +1112,10 @@
                 flex-direction: column;
             }
             #chatgpt-automation-ui.minimized .progress-container,
-            #chatgpt-automation-ui.minimized .automation-form { 
-                display: none; 
+            #chatgpt-automation-ui.minimized .automation-form {
+                display: none;
             }
-            #chatgpt-automation-ui.minimized .automation-log { 
+            #chatgpt-automation-ui.minimized .automation-log {
                 display: flex !important;
                 flex-direction: column;
                 height: 100%;
@@ -1000,7 +1134,7 @@
                 top: 0;
                 z-index: 1;
             }
-            
+
             #chatgpt-automation-ui .automation-header {
                 background: linear-gradient(135deg, var(--brand-purple, #6366f1) 0%, var(--brand-purple-darker, #4f46e5) 100%);
                 color: white;
@@ -1012,20 +1146,20 @@
                 cursor: move;
                 user-select: none;
             }
-            
+
             #chatgpt-automation-ui .automation-header h3 {
                 margin: 0;
                 font-size: 15px;
                 font-weight: 600;
                 flex: 1;
             }
-            
+
             #chatgpt-automation-ui .header-controls {
                 display: flex;
                 align-items: center;
                 gap: 12px;
             }
-            
+
             #chatgpt-automation-ui .status-indicator {
                 display: flex;
                 align-items: center;
@@ -1033,7 +1167,7 @@
                 font-size: 11px;
                 opacity: 0.9;
             }
-            
+
             #chatgpt-automation-ui .status-dot {
                 width: 6px;
                 height: 6px;
@@ -1041,7 +1175,7 @@
                 background: #10b981;
                 animation: pulse-idle 2s infinite;
             }
-            
+
             #chatgpt-automation-ui .header-btn {
                 background: rgba(255, 255, 255, 0.1);
                 border: none;
@@ -1054,28 +1188,30 @@
                 align-items: center;
                 justify-content: center;
             }
-            
+
             #chatgpt-automation-ui .header-btn:hover {
                 background: rgba(255, 255, 255, 0.2);
             }
-            
+
             #chatgpt-automation-ui .automation-content {
                 max-height: calc(100% - 60px);
-                overflow-y: auto; /* Allow internal scrolling when panel is not minimized */
+                display: flex;
+                flex-direction: column;
+                overflow: hidden;
                 -webkit-overflow-scrolling: touch;
             }
-            
+
             #chatgpt-automation-ui .progress-container {
                 padding: 12px 16px;
                 border-bottom: 1px solid var(--border-light, rgba(0,0,0,0.06));
                 background: var(--surface-secondary, #f8fafc);
             }
-            
+
             #chatgpt-automation-ui.dark-mode .progress-container {
                 background: var(--surface-secondary, #1e1e20);
                 border-color: var(--border-light, rgba(255,255,255,0.06));
             }
-            
+
             #chatgpt-automation-ui .progress-bar {
                 width: 100%;
                 height: 4px;
@@ -1084,33 +1220,35 @@
                 overflow: hidden;
                 margin-bottom: 4px;
             }
-            
+
             #chatgpt-automation-ui .progress-fill {
                 height: 100%;
                 background: var(--brand-purple, #6366f1);
                 transition: width 0.3s ease;
             }
-            
+
             #chatgpt-automation-ui .progress-text {
                 font-size: 11px;
                 color: var(--text-secondary, #6b7280);
                 text-align: center;
             }
-            
+
             #chatgpt-automation-ui .automation-form {
                 padding: 16px;
+                flex: 1 1 auto;
+                overflow: auto;
             }
-            
+
             #chatgpt-automation-ui .tab-container {
                 display: flex;
                 border-bottom: 1px solid var(--border-light, rgba(0,0,0,0.06));
                 margin-bottom: 16px;
             }
-            
+
             #chatgpt-automation-ui.dark-mode .tab-container {
                 border-color: var(--border-light, rgba(255,255,255,0.06));
             }
-            
+
             #chatgpt-automation-ui .tab-btn {
                 background: none;
                 border: none;
@@ -1122,24 +1260,24 @@
                 border-bottom: 2px solid transparent;
                 transition: all 0.2s;
             }
-            
+
             #chatgpt-automation-ui .tab-btn.active {
                 color: var(--brand-purple, #6366f1);
                 border-color: var(--brand-purple, #6366f1);
             }
-            
+
             #chatgpt-automation-ui .tab-content {
                 display: none;
             }
-            
+
             #chatgpt-automation-ui .tab-content.active {
                 display: block;
             }
-            
+
             #chatgpt-automation-ui .form-group {
                 margin-bottom: 16px;
             }
-            
+
             #chatgpt-automation-ui .form-group label {
                 display: block;
                 margin-bottom: 6px;
@@ -1147,11 +1285,11 @@
                 color: var(--text-primary, #374151);
                 font-size: 13px;
             }
-            
+
             #chatgpt-automation-ui.dark-mode .form-group label {
                 color: var(--text-primary, #f3f4f6);
             }
-            
+
             #chatgpt-automation-ui .form-group textarea {
                 width: 100%;
                 padding: 10px 12px;
@@ -1165,23 +1303,23 @@
                 color: var(--text-primary, #374151);
                 transition: border-color 0.2s, box-shadow 0.2s;
             }
-            
+
             #chatgpt-automation-ui.dark-mode .form-group textarea {
                 background: var(--input-background, #1e1e20);
                 color: var(--text-primary, #f3f4f6);
                 border-color: var(--border-medium, rgba(255,255,255,0.1));
             }
-            
+
             #chatgpt-automation-ui .form-group textarea:focus {
                 outline: none;
                 border-color: var(--brand-purple, #6366f1);
                 box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
             }
-            
+
             #chatgpt-automation-ui .code-editor {
                 position: relative;
             }
-            
+
             #chatgpt-automation-ui .editor-tools {
                 position: absolute;
                 top: 8px;
@@ -1191,11 +1329,11 @@
                 opacity: 0;
                 transition: opacity 0.2s;
             }
-            
+
             #chatgpt-automation-ui .code-editor:hover .editor-tools {
                 opacity: 1;
             }
-            
+
             #chatgpt-automation-ui .tool-btn {
                 background: var(--surface-secondary, rgba(0,0,0,0.05));
                 border: none;
@@ -1206,61 +1344,61 @@
                 color: var(--text-secondary, #6b7280);
                 transition: background 0.2s;
             }
-            
+
             #chatgpt-automation-ui .tool-btn:hover {
                 background: var(--surface-secondary, rgba(0,0,0,0.1));
             }
-            
+
             #chatgpt-automation-ui .help-text {
                 font-size: 11px;
                 color: var(--text-secondary, #6b7280);
                 margin-top: 4px;
                 font-style: italic;
             }
-            
+
             #chatgpt-automation-ui .batch-controls {
                 margin-top: 12px;
                 padding: 12px;
                 background: var(--surface-secondary, #f8fafc);
                 border-radius: 6px;
             }
-            
+
             #chatgpt-automation-ui.dark-mode .batch-controls {
                 background: var(--surface-secondary, #1e1e20);
             }
-            
+
             #chatgpt-automation-ui .batch-settings {
                 display: flex;
                 flex-direction: column;
                 gap: 8px;
                 margin-bottom: 12px;
             }
-            
+
             #chatgpt-automation-ui .batch-actions {
                 display: flex;
                 gap: 8px;
                 flex-wrap: wrap;
                 justify-content: flex-end;
             }
-            
+
             #chatgpt-automation-ui .wait-time-control {
                 display: flex;
                 align-items: center;
                 gap: 8px;
                 margin-top: 4px;
             }
-            
+
             #chatgpt-automation-ui .wait-time-control label {
                 font-size: 12px;
                 margin: 0;
                 white-space: nowrap;
                 color: var(--text-primary, #374151);
             }
-            
+
             #chatgpt-automation-ui.dark-mode .wait-time-control label {
                 color: var(--text-primary, #f3f4f6);
             }
-            
+
             #chatgpt-automation-ui .wait-time-control input[type="number"] {
                 width: 80px;
                 padding: 4px 8px;
@@ -1270,19 +1408,19 @@
                 background: var(--input-background, #ffffff);
                 color: var(--text-primary, #374151);
             }
-            
+
             #chatgpt-automation-ui.dark-mode .wait-time-control input[type="number"] {
                 background: var(--input-background, #1e1e20);
                 color: var(--text-primary, #f3f4f6);
                 border-color: var(--border-medium, rgba(255,255,255,0.1));
             }
-            
+
             #chatgpt-automation-ui .wait-time-control input[type="number"]:focus {
                 outline: none;
                 border-color: var(--brand-purple, #6366f1);
                 box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.1);
             }
-            
+
             /* Settings input styles */
             #chatgpt-automation-ui .settings-input {
                 padding: 6px 8px;
@@ -1292,49 +1430,49 @@
                 background: var(--input-background, #ffffff);
                 color: var(--text-primary, #374151);
             }
-            
+
             #chatgpt-automation-ui.dark-mode .settings-input {
                 background: var(--input-background, #1e1e20);
                 color: var(--text-primary, #f3f4f6);
                 border-color: var(--border-medium, rgba(255,255,255,0.1));
             }
-            
+
             #chatgpt-automation-ui .settings-input:focus {
                 outline: none;
                 border-color: var(--brand-purple, #6366f1);
                 box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
             }
-            
+
             #chatgpt-automation-ui .settings-input.timeout {
                 width: 140px;
             }
-            
+
             #chatgpt-automation-ui .size-inputs-grid {
                 display: flex;
                 gap: 8px;
                 flex-wrap: wrap;
             }
-            
+
             #chatgpt-automation-ui .size-input-group {
                 display: flex;
                 flex-direction: column;
                 gap: 4px;
             }
-            
+
             #chatgpt-automation-ui .size-input-group label {
                 font-size: 12px;
                 margin: 0;
                 color: var(--text-primary, #374151);
             }
-            
+
             #chatgpt-automation-ui.dark-mode .size-input-group label {
                 color: var(--text-primary, #f3f4f6);
             }
-            
+
             #chatgpt-automation-ui .settings-input.size {
                 width: 120px;
             }
-            
+
             #chatgpt-automation-ui .checkbox-label {
                 display: flex;
                 align-items: center;
@@ -1342,22 +1480,22 @@
                 font-size: 13px;
                 color: var(--text-primary, #374151);
             }
-            
+
             #chatgpt-automation-ui.dark-mode .checkbox-label {
                 color: var(--text-primary, #f3f4f6);
             }
-            
+
             #chatgpt-automation-ui .checkbox-label input[type="checkbox"] {
                 margin-right: 8px;
             }
-            
+
             #chatgpt-automation-ui .form-actions {
                 display: flex;
                 gap: 8px;
                 flex-wrap: wrap;
                 margin-top: 16px;
             }
-            
+
             #chatgpt-automation-ui .btn {
                 padding: 8px 16px;
                 border: none;
@@ -1371,59 +1509,59 @@
                 gap: 6px;
                 position: relative;
             }
-            
+
             #chatgpt-automation-ui .btn-primary {
                 background: var(--brand-purple, #6366f1);
                 color: white;
             }
-            
+
             #chatgpt-automation-ui .btn-primary:hover {
                 background: var(--brand-purple-darker, #4f46e5);
             }
-            
+
             #chatgpt-automation-ui .btn-secondary {
                 background: var(--surface-secondary, #f3f4f6);
                 color: var(--text-primary, #374151);
                 border: 1px solid var(--border-light, rgba(0,0,0,0.06));
             }
-            
+
             #chatgpt-automation-ui.dark-mode .btn-secondary {
                 background: var(--surface-secondary, #1e1e20);
                 color: var(--text-primary, #f3f4f6);
                 border-color: var(--border-light, rgba(255,255,255,0.06));
             }
-            
+
             #chatgpt-automation-ui .btn-secondary:hover {
                 background: var(--surface-secondary, #e5e7eb);
             }
-            
+
             #chatgpt-automation-ui.dark-mode .btn-secondary:hover {
                 background: var(--surface-secondary, #2a2a2d);
             }
-            
+
             #chatgpt-automation-ui .btn-danger {
                 background: #ef4444;
                 color: white;
             }
-            
+
             #chatgpt-automation-ui .btn-danger:hover {
                 background: #dc2626;
             }
-            
+
             #chatgpt-automation-ui .btn-warning {
                 background: #f59e0b;
                 color: white;
             }
-            
+
             #chatgpt-automation-ui .btn-warning:hover {
                 background: #d97706;
             }
-            
+
             #chatgpt-automation-ui .btn:disabled {
                 opacity: 0.5;
                 cursor: not-allowed;
             }
-            
+
             #chatgpt-automation-ui .spinner {
                 width: 12px;
                 height: 12px;
@@ -1432,20 +1570,25 @@
                 border-radius: 50%;
                 animation: spin 1s linear infinite;
             }
-            
+
             @keyframes spin {
                 0% { transform: rotate(0deg); }
                 100% { transform: rotate(360deg); }
             }
-            
+
             #chatgpt-automation-ui .automation-log {
                 border-top: 1px solid var(--border-light, rgba(0,0,0,0.06));
+                max-height: 220px;
+                min-height: 120px;
+                overflow: hidden;
+                display: flex;
+                flex-direction: column;
             }
-            
+
             #chatgpt-automation-ui.dark-mode .automation-log {
                 border-color: var(--border-light, rgba(255,255,255,0.06));
             }
-            
+
             #chatgpt-automation-ui .log-header {
                 padding: 12px 16px;
                 background: var(--surface-secondary, #f8fafc);
@@ -1456,23 +1599,24 @@
                 justify-content: space-between;
                 align-items: center;
             }
-            
+
             #chatgpt-automation-ui.dark-mode .log-header {
                 background: var(--surface-secondary, #1e1e20);
                 color: var(--text-primary, #f3f4f6);
             }
-            
+
             #chatgpt-automation-ui .log-header-controls {
                 display: flex;
                 gap: 4px;
             }
-            
+
             #chatgpt-automation-ui .log-content {
                 padding: 16px 16px 36px; /* extra bottom padding so last line stays visible */
                 overflow-y: auto;
                 scroll-behavior: smooth;
+                flex: 1 1 auto;
             }
-            
+
             #chatgpt-automation-ui .log-entry {
                 padding: 6px 0;
                 font-size: 11px;
@@ -1480,28 +1624,28 @@
                 border-bottom: 1px solid var(--border-light, rgba(0,0,0,0.03));
                 line-height: 1.4;
             }
-            
+
             #chatgpt-automation-ui .log-entry:last-child {
                 border-bottom: none;
                 margin-bottom: 6px; /* extra space below last entry */
             }
-            
+
             #chatgpt-automation-ui .log-info {
                 color: var(--text-primary, #374151);
             }
-            
+
             #chatgpt-automation-ui.dark-mode .log-info {
                 color: var(--text-primary, #d1d5db);
             }
-            
+
             #chatgpt-automation-ui .log-warning {
                 color: #f59e0b;
             }
-            
+
             #chatgpt-automation-ui .log-error {
                 color: #ef4444;
             }
-            
+
             #chatgpt-automation-ui .resize-handle {
                 position: absolute;
                 bottom: 0;
@@ -1511,7 +1655,32 @@
                 cursor: nw-resize;
                 background: linear-gradient(-45deg, transparent 0%, transparent 40%, var(--border-medium, rgba(0,0,0,0.1)) 40%, var(--border-medium, rgba(0,0,0,0.1)) 60%, transparent 60%, transparent 100%);
             }
-            
+
+            /* Chain canvas styles */
+            #chatgpt-automation-ui .chain-canvas {
+                border: 1px dashed var(--border-light, rgba(0,0,0,0.1));
+                border-radius: 8px;
+                padding: 8px;
+            }
+            #chatgpt-automation-ui .chain-toolbar { display:flex; gap:8px; margin-bottom:8px; flex-wrap:wrap; }
+            #chatgpt-automation-ui .chain-cards { display:flex; gap:8px; flex-wrap:wrap; align-items:flex-start; }
+            #chatgpt-automation-ui .chain-card { background: var(--surface-secondary, #f8fafc); border:1px solid var(--border-light, rgba(0,0,0,0.06)); border-radius:8px; padding:8px; min-width:140px; max-width:200px; position:relative; }
+            #chatgpt-automation-ui.dark-mode .chain-card { background: var(--surface-secondary, #1e1e20); border-color: var(--border-light, rgba(255,255,255,0.06)); }
+            #chatgpt-automation-ui .chain-card .title { font-weight:600; font-size:12px; margin-bottom:4px; }
+            #chatgpt-automation-ui .chain-card .meta { font-size:11px; opacity:0.8; margin-bottom:6px; }
+            #chatgpt-automation-ui .chain-card .actions { display:flex; gap:6px; }
+
+            /* Modal */
+            #chatgpt-automation-ui .chain-modal { position: fixed; inset:0; z-index:10001; }
+            #chatgpt-automation-ui .chain-modal-backdrop { position:absolute; inset:0; background: rgba(0,0,0,0.3); }
+            #chatgpt-automation-ui .chain-modal-dialog { position:relative; background: var(--main-surface-primary, #fff); width: 520px; max-width: calc(100% - 32px); margin: 40px auto; border-radius: 10px; box-shadow: 0 8px 30px rgba(0,0,0,0.2); overflow:hidden; }
+            #chatgpt-automation-ui.dark-mode .chain-modal-dialog { background: var(--main-surface-primary, #2d2d30); }
+            #chatgpt-automation-ui .chain-modal-header { display:flex; justify-content:space-between; align-items:center; padding:12px 16px; border-bottom:1px solid var(--border-light, rgba(0,0,0,0.06)); }
+            #chatgpt-automation-ui .chain-modal-body { padding: 12px 16px; max-height:60vh; overflow:auto; }
+            #chatgpt-automation-ui .chain-modal-footer { display:flex; gap:8px; justify-content:flex-end; padding:12px 16px; border-top:1px solid var(--border-light, rgba(0,0,0,0.06)); }
+
+            #chatgpt-automation-ui .presets-grid .preset-row { display:flex; gap:8px; margin-bottom:8px; flex-wrap:wrap; }
+
             /* Responsive design */
             @media (max-width: 768px) {
                 #chatgpt-automation-ui {
@@ -1520,33 +1689,33 @@
                     top: 10px;
                 }
             }
-            
+
             /* Animation keyframes */
             @keyframes pulse-idle {
                 0%, 100% { opacity: 1; }
                 50% { opacity: 0.5; }
             }
-            
+
             @keyframes pulse-processing {
                 0%, 100% { opacity: 1; transform: scale(1); }
                 50% { opacity: 0.7; transform: scale(1.2); }
             }
-            
+
             #chatgpt-automation-ui .status-processing .status-dot {
                 background: #f59e0b;
                 animation: pulse-processing 1s infinite;
             }
-            
+
             #chatgpt-automation-ui .status-waiting .status-dot {
                 background: #3b82f6;
                 animation: pulse-processing 1.5s infinite;
             }
-            
+
             #chatgpt-automation-ui .status-complete .status-dot {
                 background: #10b981;
                 animation: none;
             }
-            
+
             #chatgpt-automation-ui .status-error .status-dot {
                 background: #ef4444;
                 animation: pulse-processing 0.5s infinite;
@@ -1562,11 +1731,11 @@
         templateInput = document.getElementById('template-input');
         dynamicElementsInput = document.getElementById('dynamic-elements-input');
         statusIndicator = document.getElementById('status-indicator');
-        logContainer = document.querySelector('.log-content');
+    logContainer = document.querySelector('.log-content');
         progressBar = document.getElementById('progress-container');
         resizeHandle = document.getElementById('resize-handle');
 
-        // Restore saved inputs, toggles and config
+    // Restore saved inputs, toggles and config
         try {
             // Textareas
             messageInput.value = GM_getValue(STORAGE_KEYS.messageInput, '') || '';
@@ -1646,6 +1815,16 @@
             CONFIG.DEFAULT_VISIBLE = defVis;
             const dvEl = document.getElementById('default-visible-checkbox');
             if (dvEl) dvEl.checked = defVis;
+
+            // Chain definition
+            try {
+                const savedChain = GM_getValue(STORAGE_KEYS.chainDef, '');
+                const chainInput = document.getElementById('chain-json-input');
+                if (savedChain && chainInput) {
+                    chainInput.value = typeof savedChain === 'string' ? savedChain : JSON.stringify(savedChain, null, 2);
+                    chainDefinition = JSON.parse(chainInput.value);
+                }
+            } catch { /* ignore */ }
         } catch { }
 
         // Load saved state
@@ -1674,6 +1853,20 @@
         if (!uiVisible) {
             mainContainer.style.display = 'none';
         }
+
+        // Restore persisted log history
+        try {
+            const hist = GM_getValue(STORAGE_KEYS.logHistory, []);
+            if (Array.isArray(hist) && hist.length && logContainer) {
+                hist.slice(-200).forEach(h => {
+                    const div = document.createElement('div');
+                    div.className = `log-entry log-${h.type||'info'}`;
+                    div.textContent = h.msg;
+                    logContainer.appendChild(div);
+                });
+                logContainer.scrollTop = logContainer.scrollHeight;
+            }
+        } catch {}
 
         // Bind events
         bindEvents();
@@ -1710,7 +1903,7 @@
         startHeaderObserver();
         log('UI initialized successfully');
 
-        // Auto-resize container to fit initial content
+    // Auto-resize container to fit initial content
         setTimeout(() => autoResizeContainer(), 200);
     };
 
@@ -1826,7 +2019,7 @@
 
                 // Add log header height if log is visible
                 const logContainer = document.getElementById('log-container');
-                if (logContainer && logContainer.style.display !== 'none') {
+                if (logContainer) {
                     targetHeight += logHeaderHeight;
                 }
 
@@ -1853,7 +2046,7 @@
     };
 
     const bindEvents = () => {
-        // Tab switching
+    // Tab switching
         document.querySelectorAll('.tab-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 const tabName = btn.dataset.tab;
@@ -1874,7 +2067,7 @@
             });
         });
 
-        // Send button
+    // Send button
         document.getElementById('send-btn').addEventListener('click', async () => {
             const activeTab = document.querySelector('.tab-btn.active').dataset.tab;
             const sendBtn = document.getElementById('send-btn');
@@ -1906,6 +2099,28 @@
                 if (isLooping) {
                     document.getElementById('stop-batch-btn').style.display = 'inline-block';
                 }
+            } else if (activeTab === 'chain') {
+                // Run the chain using dynamic elements as batch context
+                const chainInput = document.getElementById('chain-json-input');
+                try {
+                    const chain = JSON.parse(chainInput.value.trim());
+                    chainDefinition = chain;
+                    saveToStorage(STORAGE_KEYS.chainDef, chainInput.value.trim());
+                } catch (e) {
+                    log('Invalid Chain JSON: ' + e.message, 'error');
+                    return;
+                }
+
+                // Parse dynamic elements
+                const elementsInput = dynamicElementsInput.value.trim();
+                if (elementsInput) {
+                    dynamicElements = await parseDynamicElements(elementsInput);
+                } else {
+                    dynamicElements = [];
+                }
+
+                await runChainWithBatch();
+                return; // handled by chain engine
             } else {
                 message = messageInput.value.trim() || templateInput.value.trim();
             }
@@ -1933,7 +2148,7 @@
             }
         });
 
-        // Stop batch button
+    // Stop batch button
         document.getElementById('stop-batch-btn').addEventListener('click', () => {
             stopBatchProcessing();
             document.getElementById('stop-batch-btn').style.display = 'none';
@@ -1988,10 +2203,15 @@
         // Toggle log button
         document.getElementById('toggle-log-btn').addEventListener('click', () => {
             const logElement = document.getElementById('log-container');
-            if (logElement.style.display === 'none') {
-                logElement.style.display = 'block';
+            // Instead of fully hiding, toggle between compact and expanded heights
+            const compact = logElement.dataset.compact === 'true';
+            logElement.dataset.compact = (!compact).toString();
+            if (compact) {
+                logElement.style.maxHeight = '220px';
+                log('Log expanded');
             } else {
-                logElement.style.display = 'none';
+                logElement.style.maxHeight = '120px';
+                log('Log compact');
             }
 
             // Auto-resize container after log visibility change
@@ -2023,7 +2243,7 @@
             saveToStorage(STORAGE_KEYS.autoScroll, autoScrollLogs);
         });
 
-        // Minimize button: compact the panel's height when minimized and restore on un-minimize
+    // Minimize button: compact the panel's height when minimized and restore on un-minimize
         let _previousHeight = null;
         document.getElementById('minimize-btn').addEventListener('click', () => {
             isMinimized = !isMinimized;
@@ -2125,7 +2345,7 @@ if (response.includes('error')) {
     log('Detected error in response', 'warning');
 } else {
     log('Response looks good: ' + response.length + ' characters');
-    
+
     // Extract specific information
     const matches = response.match(/\\d+/g);
     if (matches) {
@@ -2157,7 +2377,7 @@ if (response.includes('error')) {
         let isDragging = false;
         let dragOffset = { x: 0, y: 0 };
 
-        // Resizing functionality  
+        // Resizing functionality
         let isResizing = false;
         let resizeStartX, resizeStartY, resizeStartWidth, resizeStartHeight;
 
@@ -2300,6 +2520,313 @@ if (response.includes('error')) {
             try { GM_setValue(STORAGE_KEYS.configDefaultVisible, CONFIG.DEFAULT_VISIBLE); } catch { }
             log(`Default visibility ${CONFIG.DEFAULT_VISIBLE ? 'ON' : 'OFF'}`);
         });
+
+        // Chain UI: basic actions
+        const chainInput = document.getElementById('chain-json-input');
+        const chainCards = document.getElementById('chain-cards');
+        const refreshChainCards = () => {
+            if (!chainCards) return;
+            chainCards.innerHTML = '';
+            let chain;
+            try { chain = JSON.parse(chainInput.value || '{}'); } catch { chain = null; }
+            if (!chain || !Array.isArray(chain.steps)) return;
+            chain.steps.forEach(step => {
+                const card = document.createElement('div');
+                card.className = 'chain-card';
+                card.dataset.stepId = step.id;
+                card.innerHTML = `
+                    <div class="title">${step.title || step.id || '(untitled)'} </div>
+                    <div class="meta">type: ${step.type}${step.next ? ` → ${step.next}` : ''}</div>
+                    <div class="actions">
+                        <button class="btn btn-secondary btn-sm" data-action="edit">Edit</button>
+                    </div>
+                `;
+                card.querySelector('[data-action="edit"]').addEventListener('click', () => openStepEditor(step.id));
+                chainCards.appendChild(card);
+            });
+        };
+
+        const openStepEditor = (stepId) => {
+            let chain;
+            try { chain = JSON.parse(chainInput.value || '{}'); } catch { chain = { steps: [] }; }
+            if (!Array.isArray(chain.steps)) chain.steps = [];
+            let step = chain.steps.find(s => s.id === stepId);
+            if (!step) {
+                step = { id: stepId || `step-${Date.now()}`, type: 'prompt', title: '', template: '' };
+                chain.steps.push(step);
+            }
+            const modal = document.getElementById('chain-step-modal');
+            modal.style.display = 'block';
+            modal.setAttribute('aria-hidden', 'false');
+            // Populate fields
+            document.getElementById('step-id-input').value = step.id || '';
+            document.getElementById('step-title-input').value = step.title || '';
+            document.getElementById('step-type-select').value = step.type || 'prompt';
+            document.getElementById('step-template-input').value = step.template || '';
+            document.getElementById('step-http-url').value = step.url || '';
+            document.getElementById('step-http-method').value = (step.method || 'GET').toUpperCase();
+            document.getElementById('step-http-headers').value = step.headers ? JSON.stringify(step.headers) : '';
+            document.getElementById('step-http-body').value = step.bodyTemplate || '';
+            document.getElementById('step-js-code').value = step.code || '';
+            document.getElementById('step-subbatch-path').value = step.path || '';
+            const nextSel = document.getElementById('step-next-select');
+            nextSel.innerHTML = '<option value="">(end)</option>';
+            (chain.steps||[]).forEach(s => {
+                const opt = document.createElement('option');
+                opt.value = s.id; opt.textContent = s.id; if (step.next === s.id) opt.selected = true; nextSel.appendChild(opt);
+            });
+
+            const onTypeChange = () => {
+                const type = document.getElementById('step-type-select').value;
+                // Toggle field groups
+                modal.querySelectorAll('[data-field="template"]').forEach(el => el.style.display = type === 'prompt' ? 'block' : 'none');
+                modal.querySelectorAll('[data-field="http"]').forEach(el => el.style.display = type === 'http' ? 'block' : 'none');
+                modal.querySelectorAll('[data-field="code"]').forEach(el => el.style.display = type === 'js' ? 'block' : 'none');
+                modal.querySelectorAll('[data-field="subbatch"]').forEach(el => el.style.display = type === 'subbatch' ? 'block' : 'none');
+            };
+            document.getElementById('step-type-select').onchange = onTypeChange;
+            onTypeChange();
+
+            const saveBtn = document.getElementById('save-step-btn');
+            const deleteBtn = document.getElementById('delete-step-btn');
+            const closeBtn = document.getElementById('close-step-modal-btn');
+
+            const closeModal = () => { modal.style.display = 'none'; modal.setAttribute('aria-hidden','true'); };
+            closeBtn.onclick = closeModal;
+
+            deleteBtn.onclick = () => {
+                chain.steps = chain.steps.filter(s => s.id !== step.id);
+                // Remove references
+                chain.steps.forEach(s => { if (s.next === step.id) s.next = ''; });
+                chainInput.value = JSON.stringify(chain, null, 2);
+                saveToStorage(STORAGE_KEYS.chainDef, chainInput.value);
+                refreshChainCards();
+                closeModal();
+            };
+
+            saveBtn.onclick = () => {
+                const newId = document.getElementById('step-id-input').value.trim() || step.id;
+                step.id = newId;
+                step.title = document.getElementById('step-title-input').value.trim();
+                step.type = document.getElementById('step-type-select').value;
+                step.template = document.getElementById('step-template-input').value;
+                step.url = document.getElementById('step-http-url').value.trim();
+                step.method = document.getElementById('step-http-method').value.trim();
+                step.headers = (()=>{ try{ const v = document.getElementById('step-http-headers').value.trim(); return v? JSON.parse(v): undefined;}catch{return undefined;}})();
+                step.bodyTemplate = document.getElementById('step-http-body').value;
+                step.code = document.getElementById('step-js-code').value;
+                step.path = document.getElementById('step-subbatch-path').value.trim();
+                step.next = document.getElementById('step-next-select').value;
+                chainInput.value = JSON.stringify(chain, null, 2);
+                saveToStorage(STORAGE_KEYS.chainDef, chainInput.value);
+                refreshChainCards();
+                closeModal();
+            };
+        };
+
+        const addStepBtn = document.getElementById('add-step-btn');
+        if (addStepBtn) addStepBtn.addEventListener('click', () => {
+            let chain;
+            try { chain = JSON.parse(chainInput.value || '{}'); } catch { chain = {}; }
+            if (!chain.steps) chain.steps = [];
+            const id = `step-${(chain.steps.length||0)+1}`;
+            chain.steps.push({ id, title: `Step ${chain.steps.length+1}`, type: 'prompt', template: '' });
+            if (!chain.entryId) chain.entryId = id;
+            chainInput.value = JSON.stringify(chain, null, 2);
+            saveToStorage(STORAGE_KEYS.chainDef, chainInput.value);
+            refreshChainCards();
+            openStepEditor(id);
+        });
+
+        const validateChainBtn = document.getElementById('validate-chain-btn');
+        if (validateChainBtn) validateChainBtn.addEventListener('click', () => {
+            try {
+                const c = JSON.parse(chainInput.value || '{}');
+                if (!c.entryId) throw new Error('Missing entryId');
+                if (!Array.isArray(c.steps) || !c.steps.length) throw new Error('No steps');
+                const ids = new Set(c.steps.map(s=>s.id));
+                if (!ids.has(c.entryId)) throw new Error('entryId not found among steps');
+                c.steps.forEach(s=>{ if (s.next && !ids.has(s.next)) throw new Error(`Step ${s.id} next '${s.next}' not found`); });
+                log('Chain valid');
+            } catch (e) { log('Chain invalid: ' + e.message, 'error'); }
+        });
+
+        const runChainBtn = document.getElementById('run-chain-btn');
+        if (runChainBtn) runChainBtn.addEventListener('click', async () => {
+            // Mirror Send button behavior for chain
+            const elementsInput = dynamicElementsInput.value.trim();
+            if (elementsInput) dynamicElements = await parseDynamicElements(elementsInput);
+            else dynamicElements = [];
+            await runChainWithBatch();
+        });
+
+        const formatChainBtn = document.getElementById('format-chain-json-btn');
+        if (formatChainBtn) formatChainBtn.addEventListener('click', () => {
+            try { const obj = JSON.parse(chainInput.value); chainInput.value = JSON.stringify(obj, null, 2); log('Chain JSON formatted'); saveToStorage(STORAGE_KEYS.chainDef, chainInput.value);} catch(e){ log('Invalid JSON: ' + e.message, 'error'); }
+        });
+
+        // Change events to keep cards in sync
+        if (chainInput) chainInput.addEventListener('input', () => { refreshChainCards(); });
+        refreshChainCards();
+
+        // Presets: populate selects and wire buttons
+        const loadPresetSelects = () => {
+            const fill = (id, map) => { const sel = document.getElementById(id); if (!sel) return; sel.innerHTML = ''; Object.keys(map||{}).sort().forEach(name=>{ const o=document.createElement('option'); o.value=name; o.textContent=name; sel.appendChild(o); }); };
+            try {
+                fill('load-template-select', GM_getValue(STORAGE_KEYS.presetsTemplates, {}));
+                fill('load-chain-select', GM_getValue(STORAGE_KEYS.presetsChains, {}));
+                fill('load-js-select', GM_getValue(STORAGE_KEYS.presetsResponseJS, {}));
+            } catch { }
+        };
+        const getPresetName = () => (document.getElementById('preset-name-input')?.value||'').trim();
+        const savePreset = (storeKey, name, value) => {
+            if (!name) return log('Enter a preset name', 'warning');
+            try { const map = GM_getValue(storeKey, {}) || {}; map[name] = value; GM_setValue(storeKey, map); loadPresetSelects(); log('Preset saved'); } catch(e){ log('Save failed: '+e.message, 'error'); }
+        };
+        const deletePreset = (storeKey, selId) => {
+            try { const sel = document.getElementById(selId); if(!sel||!sel.value) return; const map = GM_getValue(storeKey, {}) || {}; delete map[sel.value]; GM_setValue(storeKey, map); loadPresetSelects(); log('Preset deleted'); } catch(e){ log('Delete failed: '+e.message, 'error'); }
+        };
+        const loadPreset = (storeKey, selId, apply) => {
+            try { const sel = document.getElementById(selId); const map = GM_getValue(storeKey, {}) || {}; const v = map[sel.value]; if (v==null) return; apply(v); log('Preset loaded'); } catch(e){ log('Load failed: '+e.message, 'error'); }
+        };
+        loadPresetSelects();
+        document.getElementById('save-template-preset-btn')?.addEventListener('click', ()=> savePreset(STORAGE_KEYS.presetsTemplates, getPresetName(), templateInput.value||''));
+        document.getElementById('load-template-preset-btn')?.addEventListener('click', ()=> loadPreset(STORAGE_KEYS.presetsTemplates, 'load-template-select', v=>{ templateInput.value=v; saveToStorage(STORAGE_KEYS.templateInput, v);}));
+        document.getElementById('delete-template-preset-btn')?.addEventListener('click', ()=> deletePreset(STORAGE_KEYS.presetsTemplates, 'load-template-select'));
+        document.getElementById('save-chain-preset-btn')?.addEventListener('click', ()=> savePreset(STORAGE_KEYS.presetsChains, getPresetName(), document.getElementById('chain-json-input').value||''));
+        document.getElementById('load-chain-preset-btn')?.addEventListener('click', ()=> loadPreset(STORAGE_KEYS.presetsChains, 'load-chain-select', v=>{ document.getElementById('chain-json-input').value=v; saveToStorage(STORAGE_KEYS.chainDef, v); }));
+        document.getElementById('delete-chain-preset-btn')?.addEventListener('click', ()=> deletePreset(STORAGE_KEYS.presetsChains, 'load-chain-select'));
+        document.getElementById('save-js-preset-btn')?.addEventListener('click', ()=> savePreset(STORAGE_KEYS.presetsResponseJS, getPresetName(), customCodeInput.value||''));
+        document.getElementById('load-js-preset-btn')?.addEventListener('click', ()=> loadPreset(STORAGE_KEYS.presetsResponseJS, 'load-js-select', v=>{ customCodeInput.value=v; saveToStorage(STORAGE_KEYS.customCodeInput, v);}));
+        document.getElementById('delete-js-preset-btn')?.addEventListener('click', ()=> deletePreset(STORAGE_KEYS.presetsResponseJS, 'load-js-select'));
+    };
+
+    // Run-lock utilities to avoid cross-tab collisions
+    const acquireRunLock = () => {
+        try {
+            const key = STORAGE_KEYS.runLockKey;
+            const now = Date.now();
+            const existing = localStorage.getItem(key);
+            const selfId = runLockId || (runLockId = `${now}-${Math.random().toString(36).slice(2)}`);
+            if (existing) {
+                try {
+                    const obj = JSON.parse(existing);
+                    if (obj && obj.id && obj.ts && now - obj.ts < CONFIG.RUN_LOCK_TTL_MS) {
+                        return false; // another tab active
+                    }
+                } catch { /* treat as stale */ }
+            }
+            localStorage.setItem(key, JSON.stringify({ id: selfId, ts: now }));
+            // heartbeat
+            clearInterval(runLockTimer);
+            runLockTimer = setInterval(() => {
+                try { localStorage.setItem(key, JSON.stringify({ id: selfId, ts: Date.now() })); } catch {}
+            }, CONFIG.RUN_LOCK_RENEW_MS);
+            window.addEventListener('beforeunload', releaseRunLock);
+            return true;
+        } catch { return true; }
+    };
+    const releaseRunLock = () => {
+        try { clearInterval(runLockTimer); runLockTimer = null; const key = STORAGE_KEYS.runLockKey; const existing = localStorage.getItem(key); if (existing) { const obj = JSON.parse(existing); if (!obj || obj.id === runLockId) localStorage.removeItem(key); } } catch { }
+    };
+
+    const runChainWithBatch = async () => {
+        if (!chainDefinition) {
+            try { chainDefinition = JSON.parse(document.getElementById('chain-json-input').value||'{}'); } catch { chainDefinition = null; }
+        }
+        if (!chainDefinition) { log('No chain defined', 'warning'); return; }
+
+        if (!acquireRunLock()) {
+            log('Another tab is running automation – aborting to prevent collision', 'error');
+            return;
+        }
+
+        isProcessing = true; updateStatus('processing');
+        try {
+            const items = Array.isArray(dynamicElements) ? dynamicElements : [];
+            const total = Math.max(1, items.length || 1);
+            if (items.length === 0) {
+                // Single run with empty item
+                await processChain(chainDefinition, { item: null, index: 1, total });
+            } else {
+                for (let i = 0; i < items.length; i++) {
+                    const item = items[i];
+                    updateProgress(i+1, items.length);
+                    log(`🔗 Chain run for item ${i+1}/${items.length}`);
+                    await processChain(chainDefinition, { item, index: i+1, total: items.length });
+                    if (i < items.length - 1) { log(`⏱️ Waiting ${batchWaitTime}ms before next item…`); await sleep(batchWaitTime); }
+                }
+            }
+            log('🏁 Chain batch completed');
+        } catch (e) {
+            log('Chain error: ' + e.message, 'error');
+        } finally {
+            releaseRunLock();
+            isProcessing = false; updateStatus('idle'); updateProgress(0,0);
+        }
+    };
+
+    const resolveEntryStep = (chain) => {
+        if (!chain) return null;
+        if (chain.entryId) return (chain.steps||[]).find(s=>s.id===chain.entryId) || null;
+        const steps = chain.steps||[]; if (!steps.length) return null;
+        const referenced = new Set(steps.map(s=>s.next).filter(Boolean));
+        const first = steps.find(s=>!referenced.has(s.id));
+        return first || steps[0];
+    };
+
+    const processChain = async (chain, baseContext) => {
+        const entry = resolveEntryStep(chain);
+        if (!entry) throw new Error('Empty chain');
+        let step = entry;
+        let context = { ...baseContext, lastResponseText: '', chain: { } };
+
+        while (step) {
+            log(`➡️ Step ${step.id} (${step.type})`);
+            if (step.type === 'prompt') {
+                // Render template and send
+                const msg = processDynamicTemplate(step.template||'', { ...context, item: context.item, index: context.index, total: context.total });
+                await typeMessage(msg);
+                await sleep(300);
+                await sendMessage();
+                updateStatus('waiting');
+                const respEl = await waitForResponse();
+                const resp = extractResponseText(respEl);
+                context.lastResponseText = resp;
+                context.chain[step.id] = { response: resp };
+                log(`📩 Step ${step.id} response (${resp.length} chars)`);
+            } else if (step.type === 'http') {
+                const url = processDynamicTemplate(step.url||'', context);
+                const method = (step.method||'GET').toUpperCase();
+                let headers = step.headers || {};
+                try { if (typeof headers === 'string') headers = JSON.parse(headers); } catch {}
+                const body = step.bodyTemplate ? processDynamicTemplate(step.bodyTemplate, context) : undefined;
+                const res = await http.request({ method, url, headers, data: body });
+                let payload = res.responseText || res.response || '';
+                try { const j = JSON.parse(payload); payload = j; } catch { /* keep as text */ }
+                context.chain[step.id] = { http: { status: res.status, data: payload } };
+                log(`🌐 HTTP ${method} ${url} → ${res.status}`);
+            } else if (step.type === 'js') {
+                await executeCustomCode(step.code||'', context.lastResponseText || '', { elementData: context.item, index: context.index, total: context.total });
+            } else if (step.type === 'subbatch') {
+                // Expand items from a path in context
+                const getByPath = (obj, path) => { try { return path.split('.').reduce((a,p)=> a!=null ? a[p.replace(/\[|\]/g,'')] : undefined, obj); } catch { return undefined; } };
+                const arr = getByPath(context, step.path||'') || [];
+                if (Array.isArray(arr) && arr.length) {
+                    for (let i=0;i<arr.length;i++) {
+                        const child = arr[i];
+                        log(`🧩 Sub-batch ${i+1}/${arr.length} via ${step.path}`);
+                        await processChain({ entryId: chain.entryId, steps: chain.steps }, { ...context, item: child, index: i+1, total: arr.length });
+                    }
+                } else {
+                    log(`Sub-batch path yielded no items: ${step.path||'(none)'}
+                    `,'warning');
+                }
+            } else {
+                log(`Unknown step type: ${step.type}`, 'warning');
+            }
+            step = step.next ? (chain.steps||[]).find(s=>s.id===step.next) : null;
+        }
     };
 
     // Initialize the script
