@@ -2,7 +2,7 @@
 // ==UserScript==
 // @name         ChatGPT Automation Pro
 // @namespace    http://tampermonkey.net/
-// @version      1.7
+// @version      1.8
 // @description  Advanced ChatGPT automation with dynamic templating
 // @author       Henry Russell
 // @match        https://chatgpt.com/*
@@ -801,44 +801,13 @@
 
         <div class="automation-form">
                     <div class="tab-container">
-                        <button class="tab-btn active" data-tab="simple">Simple</button>
-                        <button class="tab-btn" data-tab="template">Template</button>
-            <button class="tab-btn" data-tab="chain">Chain</button>
-                        <button class="tab-btn" data-tab="advanced">Response (JS)</button>
+                        <button class="tab-btn active" data-tab="composer">Composer</button>
                         <button class="tab-btn" data-tab="settings">Settings</button>
                     </div>
 
-                    <div class="tab-content active" id="simple-tab">
+                    <div class="tab-content active" id="composer-tab">
                         <div class="form-group">
-                            <label for="message-input">Message:</label>
-                            <textarea id="message-input" placeholder="Enter your message for ChatGPT..." rows="3"></textarea>
-                        </div>
-                    </div>
-
-                    <div class="tab-content" id="template-tab">
-                        <div class="form-group">
-                            <label for="template-input">Message Template:</label>
-                            <textarea id="template-input" placeholder="Template with placeholders like {{item}}, {{index}}, {{total}} or {item.name}..." rows="3"></textarea>
-                            <div class="help-text">Use {{item}} / {item}, {{index}} / {index}, {{total}} / {total}. Nested paths supported, e.g. {item.name} or {{item.orderId}}</div>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="dynamic-elements-input">Dynamic Elements (JSON array or function):</label>
-                            <div class="code-editor">
-                                <textarea id="dynamic-elements-input" placeholder='["item1", "item2", "item3"] or () => ["generated", "items"]' rows="4"></textarea>
-                                <div class="editor-tools">
-                                    <button class="tool-btn" id="format-json-btn" title="Format JSON">{ }</button>
-                                    <button class="tool-btn" id="validate-elements-btn" title="Validate">✓</button>
-                                    <button class="tool-btn" id="elements-syntax-check-btn" title="Check JS">JS</button>
-                                    <button class="tool-btn" id="elements-insert-fn-btn" title="Insert Snippet">📝</button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="tab-content" id="chain-tab">
-                        <div class="form-group">
-                            <label>Chain Canvas:</label>
+                            <label>Chain Composer:</label>
                             <div id="chain-canvas" class="chain-canvas">
                                 <div class="chain-toolbar">
                                     <button class="btn btn-secondary" id="add-step-btn">Add Step</button>
@@ -847,34 +816,16 @@
                                 </div>
                                 <div id="chain-cards" class="chain-cards"></div>
                             </div>
-                            <div class="help-text">Visual editor for multi-step chains. Steps connect in sequence; supports nested sub-batches.</div>
+                            <div class="help-text">Build and run multi-step chains. Steps connect in sequence and support templates and response scripts.</div>
                         </div>
                         <div class="form-group">
                             <label for="chain-json-input">Chain JSON (advanced):</label>
                             <div class="code-editor">
-                                <textarea id="chain-json-input" rows="6" placeholder='{"entryId":"step-1","steps":[{"id":"step-1","type":"prompt","title":"Create mnemonic","template":"...","next":"step-2"},{"id":"step-2","type":"prompt","title":"Create image prompt","template":"...","next":"step-3"},{"id":"step-3","type":"js","title":"Send to server","code":"// use http.postForm(...)"}]}'></textarea>
+                                <textarea id="chain-json-input" rows="6" placeholder='{"entryId":"step-1","steps":[]}'></textarea>
                                 <div class="editor-tools">
                                     <button class="tool-btn" id="format-chain-json-btn" title="Format JSON">{ }</button>
                                 </div>
                             </div>
-                        </div>
-                    </div>
-
-                    <div class="tab-content" id="advanced-tab">
-                        <div class="form-group">
-                            <label for="custom-code-input">Custom Code (JavaScript):</label>
-                            <div class="code-editor">
-                                <textarea id="custom-code-input" placeholder="// Custom code to run after response (optional)
-// Available variables: response, log, console, item, index, total, http
-// http: cross-origin helper (GM_xmlhttpRequest)
-//   await http.postForm('https://api.example.com/submit', { foo: 'bar' })
-// Example: log('Response length: ' + response.length);" rows="6"></textarea>
-                                <div class="editor-tools">
-                                    <button class="tool-btn" id="syntax-check-btn" title="Check Syntax">JS</button>
-                                    <button class="tool-btn" id="insert-template-btn" title="Insert Template">📝</button>
-                                </div>
-                            </div>
-                            <div class="help-text">Runs your JavaScript after ChatGPT finishes. Use <code>response</code> (string), <code>log()</code>, and <code>http</code> (CORS-capable) to integrate with any website's API.</div>
                         </div>
                     </div>
 
@@ -981,13 +932,6 @@
                     </div>
 
                     <div class="form-actions">
-                        <button id="send-btn" class="btn btn-primary">
-                            <span class="btn-text">Send Message</span>
-                            <span class="btn-loader" style="display: none;">
-                                <div class="spinner"></div>
-                            </span>
-                        </button>
-                        <button id="clear-btn" class="btn btn-secondary">Clear</button>
                         <button id="toggle-log-btn" class="btn btn-secondary">Toggle Log</button>
                     </div>
                 </div>
@@ -1026,14 +970,14 @@
                         <div class="form-group">
                             <label for="step-type-select">Type</label>
                             <select id="step-type-select" class="settings-input">
-                                <option value="prompt">prompt</option>
+                                <option value="simple">simple</option>
                                 <option value="http">http</option>
-                                <option value="js">js</option>
-                                <option value="subbatch">subbatch</option>
+                                <option value="response">response</option>
+                                <option value="template">template</option>
                             </select>
                         </div>
-                        <div class="form-group" data-field="template">
-                            <label for="step-template-input">Template</label>
+                        <div class="form-group" data-field="message">
+                            <label for="step-template-input">Message Template</label>
                             <textarea id="step-template-input" rows="4" class="settings-input" placeholder="Message template (supports {item.*})"></textarea>
                         </div>
                         <div class="form-group" data-field="http">
@@ -1049,9 +993,9 @@
                             <label for="step-js-code">JS Code</label>
                             <textarea id="step-js-code" rows="6" class="settings-input" placeholder="// code has access to response, item, index, total, http, log"></textarea>
                         </div>
-                        <div class="form-group" data-field="subbatch">
-                            <label for="step-subbatch-path">Sub-batch source path (in context)</label>
-                            <input id="step-subbatch-path" class="settings-input" placeholder="e.g., item.parts or results[]">
+                        <div class="form-group" data-field="template">
+                            <label for="step-template-path">Template source path (in context)</label>
+                            <input id="step-template-path" class="settings-input" placeholder="e.g., item.parts or results[]">
                         </div>
                         <div class="form-group">
                             <label for="step-next-select">Next step</label>
@@ -1120,12 +1064,16 @@
                 flex-direction: column;
                 height: 100%;
             }
+            #chatgpt-automation-ui #log-container {
+                flex: 1 1 auto;
+                display: flex;
+                flex-direction: column;
+            }
             #chatgpt-automation-ui.minimized #log-container {
-                max-height: 48px;
+                height: 48px;
                 overflow: hidden;
             }
-            #chatgpt-automation-ui.minimized .log-content {
-                /* Let logs fill available space and scroll internally */
+            #chatgpt-automation-ui .log-content {
                 flex: 1 1 auto;
                 overflow-y: auto;
             }
@@ -1268,6 +1216,7 @@
 
             #chatgpt-automation-ui .tab-content {
                 display: none;
+                overflow-y: auto;
             }
 
             #chatgpt-automation-ui .tab-content.active {
@@ -1726,10 +1675,10 @@
         document.body.appendChild(mainContainer);
 
         // Get UI elements
-        messageInput = document.getElementById('message-input');
-        customCodeInput = document.getElementById('custom-code-input');
-        templateInput = document.getElementById('template-input');
-        dynamicElementsInput = document.getElementById('dynamic-elements-input');
+        messageInput = document.getElementById('message-input') || document.createElement('textarea');
+        customCodeInput = document.getElementById('custom-code-input') || document.createElement('textarea');
+        templateInput = document.getElementById('template-input') || document.createElement('textarea');
+        dynamicElementsInput = document.getElementById('dynamic-elements-input') || document.createElement('textarea');
         statusIndicator = document.getElementById('status-indicator');
     logContainer = document.querySelector('.log-content');
         progressBar = document.getElementById('progress-container');
@@ -1774,7 +1723,7 @@
             }
 
             // Active tab
-            const savedTab = GM_getValue(STORAGE_KEYS.activeTab, 'simple');
+            const savedTab = GM_getValue(STORAGE_KEYS.activeTab, 'composer');
             const tabBtn = document.querySelector(`.tab-btn[data-tab="${savedTab}"]`);
             if (tabBtn) tabBtn.click();
 
@@ -2067,87 +2016,6 @@
             });
         });
 
-    // Send button
-        document.getElementById('send-btn').addEventListener('click', async () => {
-            const activeTab = document.querySelector('.tab-btn.active').dataset.tab;
-            const sendBtn = document.getElementById('send-btn');
-            const btnText = sendBtn.querySelector('.btn-text');
-            const btnLoader = sendBtn.querySelector('.btn-loader');
-
-            let message = '';
-            let customCode = customCodeInput.value.trim();
-            let isTemplate = false;
-
-            if (activeTab === 'simple') {
-                message = messageInput.value.trim();
-            } else if (activeTab === 'template') {
-                message = templateInput.value.trim();
-                isTemplate = true;
-
-                // Parse dynamic elements
-                const elementsInput = dynamicElementsInput.value.trim();
-                if (elementsInput) {
-                    dynamicElements = await parseDynamicElements(elementsInput);
-                    if (!Array.isArray(dynamicElements) || dynamicElements.length === 0) {
-                        log('No valid dynamic elements found', 'warning');
-                        return;
-                    }
-                }
-
-                // Check if batch processing is enabled
-                isLooping = document.getElementById('loop-checkbox').checked;
-                if (isLooping) {
-                    document.getElementById('stop-batch-btn').style.display = 'inline-block';
-                }
-            } else if (activeTab === 'chain') {
-                // Run the chain using dynamic elements as batch context
-                const chainInput = document.getElementById('chain-json-input');
-                try {
-                    const chain = JSON.parse(chainInput.value.trim());
-                    chainDefinition = chain;
-                    saveToStorage(STORAGE_KEYS.chainDef, chainInput.value.trim());
-                } catch (e) {
-                    log('Invalid Chain JSON: ' + e.message, 'error');
-                    return;
-                }
-
-                // Parse dynamic elements
-                const elementsInput = dynamicElementsInput.value.trim();
-                if (elementsInput) {
-                    dynamicElements = await parseDynamicElements(elementsInput);
-                } else {
-                    dynamicElements = [];
-                }
-
-                await runChainWithBatch();
-                return; // handled by chain engine
-            } else {
-                message = messageInput.value.trim() || templateInput.value.trim();
-            }
-
-            if (!message) {
-                log('Please enter a message', 'warning');
-                return;
-            }
-
-            // Update button state
-            sendBtn.disabled = true;
-            btnText.style.display = 'none';
-            btnLoader.style.display = 'inline-flex';
-
-            try {
-                await processMessage(message, customCode, isTemplate);
-            } finally {
-                sendBtn.disabled = false;
-                btnText.style.display = 'inline';
-                btnLoader.style.display = 'none';
-
-                if (!isLooping) {
-                    document.getElementById('stop-batch-btn').style.display = 'none';
-                }
-            }
-        });
-
     // Stop batch button
         document.getElementById('stop-batch-btn').addEventListener('click', () => {
             stopBatchProcessing();
@@ -2182,12 +2050,14 @@
         });
 
         // Clear button
-        document.getElementById('clear-btn').addEventListener('click', () => {
+        const clearBtn = document.getElementById('clear-btn');
+        if (clearBtn) clearBtn.addEventListener('click', () => {
             messageInput.value = '';
             customCodeInput.value = '';
             templateInput.value = '';
             dynamicElementsInput.value = '';
-            document.getElementById('loop-checkbox').checked = false;
+            const loopCb = document.getElementById('loop-checkbox');
+            if (loopCb) loopCb.checked = false;
             log('Form cleared');
 
             // Persist cleared state
@@ -2280,7 +2150,8 @@
         });
 
         // Tool buttons
-        document.getElementById('format-json-btn').addEventListener('click', () => {
+        const formatJsonBtn = document.getElementById('format-json-btn');
+        if (formatJsonBtn) formatJsonBtn.addEventListener('click', () => {
             try {
                 const input = dynamicElementsInput.value.trim();
                 if (input.startsWith('[')) {
@@ -2294,7 +2165,8 @@
             }
         });
 
-        document.getElementById('validate-elements-btn').addEventListener('click', async () => {
+        const validateElementsBtn = document.getElementById('validate-elements-btn');
+        if (validateElementsBtn) validateElementsBtn.addEventListener('click', async () => {
             const elements = await parseDynamicElements(dynamicElementsInput.value.trim());
             if (Array.isArray(elements) && elements.length > 0) {
                 log(`Valid! Found ${elements.length} elements: ${JSON.stringify(elements.slice(0, 3))}${elements.length > 3 ? '...' : ''}`, 'info');
@@ -2330,7 +2202,8 @@
             });
         }
 
-        document.getElementById('syntax-check-btn').addEventListener('click', async () => {
+        const syntaxCheckBtn = document.getElementById('syntax-check-btn');
+        if (syntaxCheckBtn) syntaxCheckBtn.addEventListener('click', async () => {
             try {
                 new Function(customCodeInput.value);
                 log('Syntax is valid', 'info');
@@ -2339,33 +2212,15 @@
             }
         });
 
-        document.getElementById('insert-template-btn').addEventListener('click', () => {
-            const template = `// Example custom code template
-if (response.includes('error')) {
-    log('Detected error in response', 'warning');
-} else {
-    log('Response looks good: ' + response.length + ' characters');
-
-    // Extract specific information
-    const matches = response.match(/\\d+/g);
-    if (matches) {
-        log('Found numbers: ' + matches.join(', '));
-    }
-}`;
+        const insertTemplateBtn = document.getElementById('insert-template-btn');
+        if (insertTemplateBtn) insertTemplateBtn.addEventListener('click', () => {
+            const template = `// Example custom code template\nif (response.includes('error')) {\n    log('Detected error in response', 'warning');\n} else {\n    log('Response looks good: ' + response.length + ' characters');\n\n    // Extract specific information\n    const matches = response.match(/\\d+/g);\n    if (matches) {\n        log('Found numbers: ' + matches.join(', '));\n    }\n}`;
             customCodeInput.value = template;
             try { GM_setValue(STORAGE_KEYS.customCodeInput, customCodeInput.value); } catch { }
         });
 
         // Keyboard shortcuts
         document.addEventListener('keydown', (e) => {
-            // Ctrl/Cmd + Enter to send
-            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-                if ([messageInput, customCodeInput, templateInput, dynamicElementsInput].includes(document.activeElement)) {
-                    document.getElementById('send-btn').click();
-                    e.preventDefault();
-                }
-            }
-
             // Escape to minimize
             if (e.key === 'Escape' && mainContainer.contains(document.activeElement)) {
                 document.getElementById('minimize-btn').click();
@@ -2539,9 +2394,16 @@ if (response.includes('error')) {
                     <div class="meta">type: ${step.type}${step.next ? ` → ${step.next}` : ''}</div>
                     <div class="actions">
                         <button class="btn btn-secondary btn-sm" data-action="edit">Edit</button>
+                        <button class="btn btn-danger btn-sm" data-action="delete">Delete</button>
                     </div>
                 `;
                 card.querySelector('[data-action="edit"]').addEventListener('click', () => openStepEditor(step.id));
+                card.querySelector('[data-action="delete"]').addEventListener('click', () => {
+                    chain.steps = chain.steps.filter(s => s.id !== step.id);
+                    chain.steps.forEach(s => { if (s.next === step.id) s.next = ''; });
+                    chainInput.value = JSON.stringify(chain, null, 2);
+                    refreshChainCards();
+                });
                 chainCards.appendChild(card);
             });
         };
@@ -2552,7 +2414,7 @@ if (response.includes('error')) {
             if (!Array.isArray(chain.steps)) chain.steps = [];
             let step = chain.steps.find(s => s.id === stepId);
             if (!step) {
-                step = { id: stepId || `step-${Date.now()}`, type: 'prompt', title: '', template: '' };
+                step = { id: stepId || `step-${Date.now()}`, type: 'simple', title: '', template: '' };
                 chain.steps.push(step);
             }
             const modal = document.getElementById('chain-step-modal');
@@ -2561,14 +2423,14 @@ if (response.includes('error')) {
             // Populate fields
             document.getElementById('step-id-input').value = step.id || '';
             document.getElementById('step-title-input').value = step.title || '';
-            document.getElementById('step-type-select').value = step.type || 'prompt';
+            document.getElementById('step-type-select').value = step.type || 'simple';
             document.getElementById('step-template-input').value = step.template || '';
             document.getElementById('step-http-url').value = step.url || '';
             document.getElementById('step-http-method').value = (step.method || 'GET').toUpperCase();
             document.getElementById('step-http-headers').value = step.headers ? JSON.stringify(step.headers) : '';
             document.getElementById('step-http-body').value = step.bodyTemplate || '';
             document.getElementById('step-js-code').value = step.code || '';
-            document.getElementById('step-subbatch-path').value = step.path || '';
+            document.getElementById('step-template-path').value = step.path || '';
             const nextSel = document.getElementById('step-next-select');
             nextSel.innerHTML = '<option value="">(end)</option>';
             (chain.steps||[]).forEach(s => {
@@ -2579,10 +2441,10 @@ if (response.includes('error')) {
             const onTypeChange = () => {
                 const type = document.getElementById('step-type-select').value;
                 // Toggle field groups
-                modal.querySelectorAll('[data-field="template"]').forEach(el => el.style.display = type === 'prompt' ? 'block' : 'none');
+                modal.querySelectorAll('[data-field="message"]').forEach(el => el.style.display = type === 'simple' ? 'block' : 'none');
                 modal.querySelectorAll('[data-field="http"]').forEach(el => el.style.display = type === 'http' ? 'block' : 'none');
-                modal.querySelectorAll('[data-field="code"]').forEach(el => el.style.display = type === 'js' ? 'block' : 'none');
-                modal.querySelectorAll('[data-field="subbatch"]').forEach(el => el.style.display = type === 'subbatch' ? 'block' : 'none');
+                modal.querySelectorAll('[data-field="code"]').forEach(el => el.style.display = type === 'response' ? 'block' : 'none');
+                modal.querySelectorAll('[data-field="template"]').forEach(el => el.style.display = type === 'template' ? 'block' : 'none');
             };
             document.getElementById('step-type-select').onchange = onTypeChange;
             onTypeChange();
@@ -2615,7 +2477,7 @@ if (response.includes('error')) {
                 step.headers = (()=>{ try{ const v = document.getElementById('step-http-headers').value.trim(); return v? JSON.parse(v): undefined;}catch{return undefined;}})();
                 step.bodyTemplate = document.getElementById('step-http-body').value;
                 step.code = document.getElementById('step-js-code').value;
-                step.path = document.getElementById('step-subbatch-path').value.trim();
+                step.path = document.getElementById('step-template-path').value.trim();
                 step.next = document.getElementById('step-next-select').value;
                 chainInput.value = JSON.stringify(chain, null, 2);
                 saveToStorage(STORAGE_KEYS.chainDef, chainInput.value);
@@ -2630,7 +2492,11 @@ if (response.includes('error')) {
             try { chain = JSON.parse(chainInput.value || '{}'); } catch { chain = {}; }
             if (!chain.steps) chain.steps = [];
             const id = `step-${(chain.steps.length||0)+1}`;
-            chain.steps.push({ id, title: `Step ${chain.steps.length+1}`, type: 'prompt', template: '' });
+            chain.steps.push({ id, title: `Step ${chain.steps.length+1}`, type: 'simple', template: '' });
+            if (chain.steps.length > 1) {
+                const prev = chain.steps[chain.steps.length - 2];
+                if (prev && !prev.next) prev.next = id;
+            }
             if (!chain.entryId) chain.entryId = id;
             chainInput.value = JSON.stringify(chain, null, 2);
             saveToStorage(STORAGE_KEYS.chainDef, chainInput.value);
@@ -2783,7 +2649,7 @@ if (response.includes('error')) {
 
         while (step) {
             log(`➡️ Step ${step.id} (${step.type})`);
-            if (step.type === 'prompt') {
+            if (step.type === 'simple') {
                 // Render template and send
                 const msg = processDynamicTemplate(step.template||'', { ...context, item: context.item, index: context.index, total: context.total });
                 await typeMessage(msg);
@@ -2806,20 +2672,20 @@ if (response.includes('error')) {
                 try { const j = JSON.parse(payload); payload = j; } catch { /* keep as text */ }
                 context.chain[step.id] = { http: { status: res.status, data: payload } };
                 log(`🌐 HTTP ${method} ${url} → ${res.status}`);
-            } else if (step.type === 'js') {
+            } else if (step.type === 'response') {
                 await executeCustomCode(step.code||'', context.lastResponseText || '', { elementData: context.item, index: context.index, total: context.total });
-            } else if (step.type === 'subbatch') {
+            } else if (step.type === 'template') {
                 // Expand items from a path in context
                 const getByPath = (obj, path) => { try { return path.split('.').reduce((a,p)=> a!=null ? a[p.replace(/\[|\]/g,'')] : undefined, obj); } catch { return undefined; } };
                 const arr = getByPath(context, step.path||'') || [];
                 if (Array.isArray(arr) && arr.length) {
                     for (let i=0;i<arr.length;i++) {
                         const child = arr[i];
-                        log(`🧩 Sub-batch ${i+1}/${arr.length} via ${step.path}`);
+                        log(`🧩 Template ${i+1}/${arr.length} via ${step.path}`);
                         await processChain({ entryId: chain.entryId, steps: chain.steps }, { ...context, item: child, index: i+1, total: arr.length });
                     }
                 } else {
-                    log(`Sub-batch path yielded no items: ${step.path||'(none)'}
+                    log(`Template path yielded no items: ${step.path||'(none)'}
                     `,'warning');
                 }
             } else {

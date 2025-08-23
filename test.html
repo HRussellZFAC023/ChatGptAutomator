@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>ChatGPT Automator Test</title>
+<script>
+window.GM_getValue = () => '';
+window.GM_setValue = () => {};
+window.GM_xmlhttpRequest = () => {};
+window.unsafeWindow = window;
+</script>
+<script src="chatgptAutomation.js"></script>
+</head>
+<body>
+<textarea id="prompt-textarea"></textarea>
+<button data-testid="send-button"></button>
+<div class="conversation-wrapper"></div>
+</body>
+</html>
