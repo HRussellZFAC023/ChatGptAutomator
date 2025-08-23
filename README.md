@@ -18,11 +18,11 @@ Automate ChatGPT in your browser: type, send, wait, then run your code on the re
 - CORS-safe HTTP helper to call any API from your code
 
 ## Quick start
-1) Simple tab: paste a message → Send
-2) Template tab: add Dynamic Elements (JSON array) and a message template → Send
-3) Response (JS) tab: paste code that runs after the reply
+1) Open the **Composer** tab and add steps
+2) Use the step editor to configure Simple messages, Templates, HTTP calls or Response JS
+3) Press **Run Composer** and watch the logs below
 
-Context available to your JS: response, log, console, item, index, total, http
+Context available to Response JS: response, log, console, item, index, total, http
 
 ## Handy prompt
 - JSON-only output

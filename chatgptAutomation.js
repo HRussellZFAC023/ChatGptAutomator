@@ -2,7 +2,7 @@
 // ==UserScript==
 // @name         ChatGPT Automation Pro
 // @namespace    http://tampermonkey.net/
-// @version      1.7
+// @version      1.9
 // @description  Advanced ChatGPT automation with dynamic templating
 // @author       Henry Russell
 // @match        https://chatgpt.com/*
@@ -39,7 +39,6 @@
     let isProcessing = false;
     let isLooping = false;
     let currentBatchIndex = 0;
-    let dynamicElements = [];
     let lastResponseElement = null;
     let responseObserver = null;
     let isMinimized = false;
@@ -47,10 +46,9 @@
     let uiVisible = CONFIG.DEFAULT_VISIBLE;
     let headerObserverStarted = false;
     let batchWaitTime = 2000; // Default wait time between batch items
-    let autoRemoveProcessed = true; // Whether to remove processed items from textbox
     let autoScrollLogs = true; // Whether to auto-scroll logs
     let newChatPerItem = false; // Whether to start new chat for each item
-    // Chain state
+    // Composer state
     let chainDefinition = null;
     let runLockId = null;
     let runLockTimer = null;
@@ -62,7 +60,6 @@
         dynamicElementsInput: 'dynamicElementsInput',
         customCodeInput: 'customCodeInput',
         loop: 'looping',
-        autoRemove: 'autoRemoveProcessed',
         newChat: 'newChatPerItem',
         autoScroll: 'autoScrollLogs',
         waitTime: 'batchWaitTime',
@@ -429,19 +426,6 @@
     };
 
     // Function to update dynamic elements in real-time
-    const updateDynamicElementsDisplay = (remainingElements) => {
-        if (dynamicElementsInput && autoRemoveProcessed) {
-            try {
-                const newValue = JSON.stringify(remainingElements, null, 2);
-                dynamicElementsInput.value = newValue;
-                // Persist queue text so we can resume after refresh
-                GM_setValue(STORAGE_KEYS.dynamicElementsInput, newValue);
-                log(`Updated queue: ${remainingElements.length} items remaining`);
-            } catch (error) {
-                log(`Error updating display: ${error.message}`, 'warning');
-            }
-        }
-    };
 
     // ChatGPT interaction functions
     const getChatInput = () => {
@@ -586,167 +570,6 @@
         return responseElement.textContent.trim();
     };
 
-    // Main automation function with batch processing
-    const processMessage = async (message, customCode = '', isTemplate = false) => {
-        if (isProcessing && !isLooping) {
-            log('⚠️ Already processing a message', 'warning');
-            return;
-        }
-
-        if (!isLooping) {
-            isProcessing = true;
-            currentBatchIndex = 0;
-        }
-
-        updateStatus('processing');
-
-        try {
-            // Build a lightweight queue that can react to mid-batch template edits
-            let messagesToProcess = [];
-            if (isTemplate && dynamicElements.length > 0) {
-                messagesToProcess = dynamicElements.map((element, index) => ({
-                    elementData: element,
-                    index: index + 1,
-                    customCode
-                }));
-                if (CONFIG.DEBUG_MODE) {
-                    log(`🧮 Queue initialized with ${messagesToProcess.length} items`);
-                }
-            } else {
-                messagesToProcess = [{ message, customCode }];
-            }
-
-            for (let i = 0; i < messagesToProcess.length; i++) {
-                let processedMessage = message;
-                const { customCode: code, elementData, index } = messagesToProcess[i];
-
-                updateProgress(i + 1, messagesToProcess.length);
-
-                if (isTemplate) {
-                    // Re-read current template so edits mid-batch take effect
-                    const currentTemplate = (templateInput && typeof templateInput.value === 'string') ? templateInput.value.trim() : message;
-                    processedMessage = processDynamicTemplate(currentTemplate || message, {
-                        item: elementData,
-                        index: index,
-                        total: messagesToProcess.length
-                    });
-                    log(`📦 Item ${index}/${messagesToProcess.length}`);
-                    // Prompt preview
-                    log(`📝 Prompt ${index}/${messagesToProcess.length}: ${clip(processedMessage, 300)}`);
-                } else {
-                    processedMessage = messagesToProcess[i].message;
-                    log(`📝 Prompt: ${clip(processedMessage, 300)}`);
-                }
-
-                let success = false;
-                let retryCount = 0;
-                const maxRetries = 3;
-
-                while (!success && retryCount <= maxRetries) {
-                    try {
-                        if (retryCount > 0) {
-                            log(`🔁 Retry attempt ${retryCount}/${maxRetries}${isTemplate ? ` for item ${index}` : ''}`);
-                            await sleep(batchWaitTime); // Wait before retry
-                        }
-
-                        // Start new chat if option is enabled and not the first item
-                        if (newChatPerItem && (i > 0 || retryCount > 0)) {
-                            log('🆕 Starting new chat for next item…');
-                            const chatSuccess = await startNewChat();
-                            if (!chatSuccess) {
-                                log('⚠️ Failed to start new chat, continuing in current chat', 'warning');
-                            }
-                            await sleep(1000); // Additional wait after new chat
-                        }
-
-                        // Type the message
-                        await typeMessage(processedMessage);
-                        await sleep(500);
-
-                        // Send the message
-                        await sendMessage();
-                        updateStatus('waiting');
-
-                        // Wait for response
-                        log('⏳ Waiting for ChatGPT response…');
-                        const responseElement = await waitForResponse();
-                        const responseText = extractResponseText(responseElement);
-                        log(`📩 Response received (${responseText.length} chars)`);
-                        log(`📄 ${clip(responseText, 500)}`);
-
-                        // Execute custom code if provided
-                        if (code && code.trim() !== '') {
-                            if (CONFIG.DEBUG_MODE && isTemplate) {
-                                try { log(`🧪 Custom code context i=${index}/${messagesToProcess.length}`); } catch {}
-                            }
-                            log('⚙️ Executing custom code…');
-                            await executeCustomCode(code, responseText, {
-                                elementData,
-                                index,
-                                total: messagesToProcess.length
-                            });
-                        }
-
-                        // Item processed successfully - remove from queue text if auto-remove is enabled
-                        if (isTemplate && autoRemoveProcessed) {
-                            const idx = dynamicElements.indexOf(elementData);
-                            if (idx >= 0) {
-                                dynamicElements.splice(idx, 1);
-                                updateDynamicElementsDisplay(dynamicElements);
-                            }
-                        }
-
-                        log(`${isTemplate ? `✅ Item ${index}` : '✅ Message'} processed successfully`);
-                        success = true;
-
-                    } catch (itemError) {
-                        retryCount++;
-                        const at = isTemplate ? `item ${index} ` : '';
-                        log(`❌ Error processing ${at}(attempt ${retryCount}): ${itemError.message}`, 'error');
-
-                        if (retryCount > maxRetries) {
-                            if (isTemplate) log(`⏭️ Item ${index} failed after ${maxRetries} retries, skipping…`, 'error');
-                        }
-                    }
-                }
-
-                // Add delay between batch items (user configurable)
-                if (i < messagesToProcess.length - 1) {
-                    log(`⏱️ Waiting ${batchWaitTime}ms before next item…`);
-                    await sleep(batchWaitTime);
-                }
-
-                // Check if loop should continue
-                if (!isLooping) break;
-            }
-
-            updateStatus('complete');
-            log('🏁 Batch processing completed');
-            updateProgress(0, 0); // Reset progress
-
-        } catch (error) {
-            log(`💥 Batch error: ${error.message}`, 'error');
-            updateStatus('error');
-            updateProgress(0, 0);
-        } finally {
-            if (!isLooping) {
-                isProcessing = false;
-                currentBatchIndex = 0;
-            }
-            setTimeout(() => updateStatus('idle'), 2000);
-        }
-    };
-
-    // Stop batch processing
-    const stopBatchProcessing = () => {
-        isLooping = false;
-        isProcessing = false;
-        currentBatchIndex = 0;
-        updateStatus('idle');
-        updateProgress(0, 0);
-        log('Batch processing stopped');
-    };
-
     // Update progress bar
     const updateProgress = (current, total) => {
         if (!progressBar) return;
@@ -801,83 +624,61 @@
 
         <div class="automation-form">
                     <div class="tab-container">
-                        <button class="tab-btn active" data-tab="simple">Simple</button>
-                        <button class="tab-btn" data-tab="template">Template</button>
-            <button class="tab-btn" data-tab="chain">Chain</button>
-                        <button class="tab-btn" data-tab="advanced">Response (JS)</button>
+                        <button class="tab-btn active" data-tab="composer">Composer</button>
                         <button class="tab-btn" data-tab="settings">Settings</button>
                     </div>
 
-                    <div class="tab-content active" id="simple-tab">
+                    <div class="tab-content active" id="composer-tab">
                         <div class="form-group">
-                            <label for="message-input">Message:</label>
-                            <textarea id="message-input" placeholder="Enter your message for ChatGPT..." rows="3"></textarea>
-                        </div>
-                    </div>
-
-                    <div class="tab-content" id="template-tab">
-                        <div class="form-group">
-                            <label for="template-input">Message Template:</label>
-                            <textarea id="template-input" placeholder="Template with placeholders like {{item}}, {{index}}, {{total}} or {item.name}..." rows="3"></textarea>
-                            <div class="help-text">Use {{item}} / {item}, {{index}} / {index}, {{total}} / {total}. Nested paths supported, e.g. {item.name} or {{item.orderId}}</div>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="dynamic-elements-input">Dynamic Elements (JSON array or function):</label>
-                            <div class="code-editor">
-                                <textarea id="dynamic-elements-input" placeholder='["item1", "item2", "item3"] or () => ["generated", "items"]' rows="4"></textarea>
-                                <div class="editor-tools">
-                                    <button class="tool-btn" id="format-json-btn" title="Format JSON">{ }</button>
-                                    <button class="tool-btn" id="validate-elements-btn" title="Validate">✓</button>
-                                    <button class="tool-btn" id="elements-syntax-check-btn" title="Check JS">JS</button>
-                                    <button class="tool-btn" id="elements-insert-fn-btn" title="Insert Snippet">📝</button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="tab-content" id="chain-tab">
-                        <div class="form-group">
-                            <label>Chain Canvas:</label>
+                            <label>Composer Canvas:</label>
                             <div id="chain-canvas" class="chain-canvas">
                                 <div class="chain-toolbar">
                                     <button class="btn btn-secondary" id="add-step-btn">Add Step</button>
-                                    <button class="btn btn-secondary" id="validate-chain-btn">Validate Chain</button>
-                                    <button class="btn btn-primary" id="run-chain-btn">Run Chain</button>
+                                    <button class="btn btn-secondary" id="validate-chain-btn">Validate Composer</button>
+                                    <button class="btn btn-primary" id="run-chain-btn">Run Composer</button>
                                 </div>
                                 <div id="chain-cards" class="chain-cards"></div>
                             </div>
-                            <div class="help-text">Visual editor for multi-step chains. Steps connect in sequence; supports nested sub-batches.</div>
+                            <div class="help-text">Design step-by-step automations. Add steps and link them to run in sequence.</div>
                         </div>
                         <div class="form-group">
-                            <label for="chain-json-input">Chain JSON (advanced):</label>
+                            <label for="chain-json-input">Composer JSON (advanced):</label>
                             <div class="code-editor">
-                                <textarea id="chain-json-input" rows="6" placeholder='{"entryId":"step-1","steps":[{"id":"step-1","type":"prompt","title":"Create mnemonic","template":"...","next":"step-2"},{"id":"step-2","type":"prompt","title":"Create image prompt","template":"...","next":"step-3"},{"id":"step-3","type":"js","title":"Send to server","code":"// use http.postForm(...)"}]}'></textarea>
+                                <textarea id="chain-json-input" rows="6" placeholder='{"entryId":"step-1","steps":[{"id":"step-1","type":"simple","title":"Write note","message":"Hello","next":"step-2"},{"id":"step-2","type":"response","title":"Process","code":"log(response)"}]}'></textarea>
                                 <div class="editor-tools">
                                     <button class="tool-btn" id="format-chain-json-btn" title="Format JSON">{ }</button>
                                 </div>
                             </div>
                         </div>
-                    </div>
-
-                    <div class="tab-content" id="advanced-tab">
                         <div class="form-group">
-                            <label for="custom-code-input">Custom Code (JavaScript):</label>
-                            <div class="code-editor">
-                                <textarea id="custom-code-input" placeholder="// Custom code to run after response (optional)
-// Available variables: response, log, console, item, index, total, http
-// http: cross-origin helper (GM_xmlhttpRequest)
-//   await http.postForm('https://api.example.com/submit', { foo: 'bar' })
-// Example: log('Response length: ' + response.length);" rows="6"></textarea>
-                                <div class="editor-tools">
-                                    <button class="tool-btn" id="syntax-check-btn" title="Check Syntax">JS</button>
-                                    <button class="tool-btn" id="insert-template-btn" title="Insert Template">📝</button>
+                            <label>Presets:</label>
+                            <div class="presets-grid">
+                                <div class="preset-block">
+                                    <div class="preset-row">
+                                        <input type="text" id="preset-name-input" class="settings-input" placeholder="Preset name">
+                                    </div>
+                                    <div class="preset-row">
+                                        <button class="btn btn-secondary" id="save-template-preset-btn">Save Template</button>
+                                        <select id="load-template-select" class="settings-input"></select>
+                                        <button class="btn btn-primary" id="load-template-preset-btn">Load</button>
+                                        <button class="btn btn-danger" id="delete-template-preset-btn">Delete</button>
+                                    </div>
+                                    <div class="preset-row">
+                                        <button class="btn btn-secondary" id="save-chain-preset-btn">Save Composer</button>
+                                        <select id="load-chain-select" class="settings-input"></select>
+                                        <button class="btn btn-primary" id="load-chain-preset-btn">Load</button>
+                                        <button class="btn btn-danger" id="delete-chain-preset-btn">Delete</button>
+                                    </div>
+                                    <div class="preset-row">
+                                        <button class="btn btn-secondary" id="save-js-preset-btn">Save Response JS</button>
+                                        <select id="load-js-select" class="settings-input"></select>
+                                        <button class="btn btn-primary" id="load-js-preset-btn">Load</button>
+                                        <button class="btn btn-danger" id="delete-js-preset-btn">Delete</button>
+                                    </div>
                                 </div>
                             </div>
-                            <div class="help-text">Runs your JavaScript after ChatGPT finishes. Use <code>response</code> (string), <code>log()</code>, and <code>http</code> (CORS-capable) to integrate with any website's API.</div>
                         </div>
                     </div>
-
                     <div class="tab-content" id="settings-tab">
                         <div class="form-group">
                             <label>Debug mode:</label>
@@ -897,11 +698,6 @@
                                         Process all items in batch
                                     </label>
                                     <label class="checkbox-label">
-                                        <input type="checkbox" id="auto-remove-checkbox" checked>
-                                        <span class="checkmark"></span>
-                                        Remove processed items from queue
-                                    </label>
-                                    <label class="checkbox-label">
                                         <input type="checkbox" id="new-chat-checkbox">
                                         <span class="checkmark"></span>
                                         Start new chat for each item
@@ -910,9 +706,6 @@
                                         <label for="wait-time-input">Wait between items (ms):</label>
                                         <input type="number" id="wait-time-input" min="100" max="30000" value="2000" step="100">
                                     </div>
-                                </div>
-                                <div class="batch-actions">
-                                    <button id="stop-batch-btn" class="btn btn-danger" style="display: none;">Stop Batch</button>
                                 </div>
                             </div>
                         </div>
@@ -950,46 +743,8 @@
                             </label>
                             <div class="help-text">Controls default visibility on page load. You can still toggle from the header button.</div>
                         </div>
-                        <div class="form-group">
-                            <label>Presets:</label>
-                            <div class="presets-grid">
-                                <div class="preset-block">
-                                    <div class="preset-row">
-                                        <input type="text" id="preset-name-input" class="settings-input" placeholder="Preset name">
-                                    </div>
-                                    <div class="preset-row">
-                                        <button class="btn btn-secondary" id="save-template-preset-btn">Save Template</button>
-                                        <select id="load-template-select" class="settings-input"></select>
-                                        <button class="btn btn-primary" id="load-template-preset-btn">Load</button>
-                                        <button class="btn btn-danger" id="delete-template-preset-btn">Delete</button>
-                                    </div>
-                                    <div class="preset-row">
-                                        <button class="btn btn-secondary" id="save-chain-preset-btn">Save Chain</button>
-                                        <select id="load-chain-select" class="settings-input"></select>
-                                        <button class="btn btn-primary" id="load-chain-preset-btn">Load</button>
-                                        <button class="btn btn-danger" id="delete-chain-preset-btn">Delete</button>
-                                    </div>
-                                    <div class="preset-row">
-                                        <button class="btn btn-secondary" id="save-js-preset-btn">Save Response JS</button>
-                                        <select id="load-js-select" class="settings-input"></select>
-                                        <button class="btn btn-primary" id="load-js-preset-btn">Load</button>
-                                        <button class="btn btn-danger" id="delete-js-preset-btn">Delete</button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
                     </div>
 
-                    <div class="form-actions">
-                        <button id="send-btn" class="btn btn-primary">
-                            <span class="btn-text">Send Message</span>
-                            <span class="btn-loader" style="display: none;">
-                                <div class="spinner"></div>
-                            </span>
-                        </button>
-                        <button id="clear-btn" class="btn btn-secondary">Clear</button>
-                        <button id="toggle-log-btn" class="btn btn-secondary">Toggle Log</button>
-                    </div>
                 </div>
 
                 <div class="automation-log" id="log-container">
@@ -1026,15 +781,38 @@
                         <div class="form-group">
                             <label for="step-type-select">Type</label>
                             <select id="step-type-select" class="settings-input">
-                                <option value="prompt">prompt</option>
+                                <option value="simple">simple</option>
+                                <option value="template">template</option>
                                 <option value="http">http</option>
-                                <option value="js">js</option>
-                                <option value="subbatch">subbatch</option>
+                                <option value="response">response</option>
                             </select>
                         </div>
+                        <div class="form-group" data-field="simple">
+                            <label for="message-input">Message</label>
+                            <textarea id="message-input" rows="4" class="settings-input" placeholder="Enter message"></textarea>
+                        </div>
                         <div class="form-group" data-field="template">
-                            <label for="step-template-input">Template</label>
-                            <textarea id="step-template-input" rows="4" class="settings-input" placeholder="Message template (supports {item.*})"></textarea>
+                            <label for="template-input">Message Template</label>
+                            <textarea id="template-input" rows="4" class="settings-input" placeholder="Template with {{item}} or {item.name}"></textarea>
+                            <div class="help-text">Use {{item}} / {item}, {{index}} / {index}, {{total}} / {total}.</div>
+                            <div class="preset-inline">
+                                <button class="btn btn-secondary btn-sm" id="save-template-step-btn">Save</button>
+                                <select id="load-template-step-select" class="settings-input"></select>
+                                <button class="btn btn-primary btn-sm" id="load-template-step-btn">Load</button>
+                                <button class="btn btn-danger btn-sm" id="delete-template-step-btn">Delete</button>
+                            </div>
+                        </div>
+                        <div class="form-group" data-field="template">
+                            <label for="dynamic-elements-input">Dynamic Elements (JSON array or function)</label>
+                            <div class="code-editor">
+                                <textarea id="dynamic-elements-input" rows="4" class="settings-input" placeholder='["item1"] or () => ["items"]'></textarea>
+                                <div class="editor-tools">
+                                    <button class="tool-btn" id="format-json-btn" title="Format JSON">{ }</button>
+                                    <button class="tool-btn" id="validate-elements-btn" title="Validate">✓</button>
+                                    <button class="tool-btn" id="elements-syntax-check-btn" title="Check JS">JS</button>
+                                    <button class="tool-btn" id="elements-insert-fn-btn" title="Insert Snippet">📝</button>
+                                </div>
+                            </div>
                         </div>
                         <div class="form-group" data-field="http">
                             <label>HTTP</label>
@@ -1046,12 +824,20 @@
                             <textarea id="step-http-body" rows="3" class="settings-input" placeholder="Body template (optional)"></textarea>
                         </div>
                         <div class="form-group" data-field="code">
-                            <label for="step-js-code">JS Code</label>
-                            <textarea id="step-js-code" rows="6" class="settings-input" placeholder="// code has access to response, item, index, total, http, log"></textarea>
-                        </div>
-                        <div class="form-group" data-field="subbatch">
-                            <label for="step-subbatch-path">Sub-batch source path (in context)</label>
-                            <input id="step-subbatch-path" class="settings-input" placeholder="e.g., item.parts or results[]">
+                            <label for="custom-code-input">Custom Code (JavaScript)</label>
+                            <div class="code-editor">
+                                <textarea id="custom-code-input" rows="6" class="settings-input" placeholder="// code has access to response, item, index, total, http, log"></textarea>
+                                <div class="editor-tools">
+                                    <button class="tool-btn" id="syntax-check-btn" title="Check Syntax">JS</button>
+                                    <button class="tool-btn" id="insert-template-btn" title="Insert Template">📝</button>
+                                </div>
+                                <div class="preset-inline">
+                                    <button class="btn btn-secondary btn-sm" id="save-js-step-btn">Save</button>
+                                    <select id="load-js-step-select" class="settings-input"></select>
+                                    <button class="btn btn-primary btn-sm" id="load-js-step-btn">Load</button>
+                                    <button class="btn btn-danger btn-sm" id="delete-js-step-btn">Delete</button>
+                                </div>
+                            </div>
                         </div>
                         <div class="form-group">
                             <label for="step-next-select">Next step</label>
@@ -1121,11 +907,10 @@
                 height: 100%;
             }
             #chatgpt-automation-ui.minimized #log-container {
-                max-height: 48px;
+                flex: 0 0 48px;
                 overflow: hidden;
             }
             #chatgpt-automation-ui.minimized .log-content {
-                /* Let logs fill available space and scroll internally */
                 flex: 1 1 auto;
                 overflow-y: auto;
             }
@@ -1197,7 +982,7 @@
                 max-height: calc(100% - 60px);
                 display: flex;
                 flex-direction: column;
-                overflow: hidden;
+                overflow-y: auto;
                 -webkit-overflow-scrolling: touch;
             }
 
@@ -1268,6 +1053,8 @@
 
             #chatgpt-automation-ui .tab-content {
                 display: none;
+                height: 100%;
+                overflow-y: auto;
             }
 
             #chatgpt-automation-ui .tab-content.active {
@@ -1578,11 +1365,10 @@
 
             #chatgpt-automation-ui .automation-log {
                 border-top: 1px solid var(--border-light, rgba(0,0,0,0.06));
-                max-height: 220px;
-                min-height: 120px;
-                overflow: hidden;
+                flex: 1 0 160px;
                 display: flex;
                 flex-direction: column;
+                overflow: auto;
             }
 
             #chatgpt-automation-ui.dark-mode .automation-log {
@@ -1656,7 +1442,7 @@
                 background: linear-gradient(-45deg, transparent 0%, transparent 40%, var(--border-medium, rgba(0,0,0,0.1)) 40%, var(--border-medium, rgba(0,0,0,0.1)) 60%, transparent 60%, transparent 100%);
             }
 
-            /* Chain canvas styles */
+            /* Composer canvas styles */
             #chatgpt-automation-ui .chain-canvas {
                 border: 1px dashed var(--border-light, rgba(0,0,0,0.1));
                 border-radius: 8px;
@@ -1665,6 +1451,9 @@
             #chatgpt-automation-ui .chain-toolbar { display:flex; gap:8px; margin-bottom:8px; flex-wrap:wrap; }
             #chatgpt-automation-ui .chain-cards { display:flex; gap:8px; flex-wrap:wrap; align-items:flex-start; }
             #chatgpt-automation-ui .chain-card { background: var(--surface-secondary, #f8fafc); border:1px solid var(--border-light, rgba(0,0,0,0.06)); border-radius:8px; padding:8px; min-width:140px; max-width:200px; position:relative; }
+            #chatgpt-automation-ui .chain-cards .empty-chain { border:2px dotted var(--border-medium, rgba(0,0,0,0.2)); padding:24px; border-radius:8px; background: var(--surface-secondary, #f8fafc); text-align:center; flex:1 1 100%; }
+            #chatgpt-automation-ui.dark-mode .chain-cards .empty-chain { background: var(--surface-secondary, #1e1e20); border-color: var(--border-medium, rgba(255,255,255,0.2)); }
+            #chatgpt-automation-ui .empty-chain button { margin-top:8px; }
             #chatgpt-automation-ui.dark-mode .chain-card { background: var(--surface-secondary, #1e1e20); border-color: var(--border-light, rgba(255,255,255,0.06)); }
             #chatgpt-automation-ui .chain-card .title { font-weight:600; font-size:12px; margin-bottom:4px; }
             #chatgpt-automation-ui .chain-card .meta { font-size:11px; opacity:0.8; margin-bottom:6px; }
@@ -1680,6 +1469,8 @@
             #chatgpt-automation-ui .chain-modal-footer { display:flex; gap:8px; justify-content:flex-end; padding:12px 16px; border-top:1px solid var(--border-light, rgba(0,0,0,0.06)); }
 
             #chatgpt-automation-ui .presets-grid .preset-row { display:flex; gap:8px; margin-bottom:8px; flex-wrap:wrap; }
+            #chatgpt-automation-ui .preset-inline { display:flex; gap:4px; margin-top:4px; flex-wrap:wrap; }
+            #chatgpt-automation-ui .preset-inline select { flex:1 1 auto; }
 
             /* Responsive design */
             @media (max-width: 768px) {
@@ -1746,16 +1537,11 @@
 
             // Checkboxes and switches
             const loopEl = document.getElementById('loop-checkbox');
-            const autoRemoveEl = document.getElementById('auto-remove-checkbox');
             const newChatEl = document.getElementById('new-chat-checkbox');
 
             if (loopEl) {
                 loopEl.checked = !!GM_getValue(STORAGE_KEYS.loop, false);
                 isLooping = loopEl.checked;
-            }
-            if (autoRemoveEl) {
-                autoRemoveEl.checked = GM_getValue(STORAGE_KEYS.autoRemove, true);
-                autoRemoveProcessed = autoRemoveEl.checked;
             }
             if (newChatEl) {
                 newChatEl.checked = !!GM_getValue(STORAGE_KEYS.newChat, false);
@@ -1774,7 +1560,7 @@
             }
 
             // Active tab
-            const savedTab = GM_getValue(STORAGE_KEYS.activeTab, 'simple');
+            const savedTab = GM_getValue(STORAGE_KEYS.activeTab, 'composer');
             const tabBtn = document.querySelector(`.tab-btn[data-tab="${savedTab}"]`);
             if (tabBtn) tabBtn.click();
 
@@ -1816,7 +1602,7 @@
             const dvEl = document.getElementById('default-visible-checkbox');
             if (dvEl) dvEl.checked = defVis;
 
-            // Chain definition
+            // Composer definition
             try {
                 const savedChain = GM_getValue(STORAGE_KEYS.chainDef, '');
                 const chainInput = document.getElementById('chain-json-input');
@@ -2067,100 +1853,7 @@
             });
         });
 
-    // Send button
-        document.getElementById('send-btn').addEventListener('click', async () => {
-            const activeTab = document.querySelector('.tab-btn.active').dataset.tab;
-            const sendBtn = document.getElementById('send-btn');
-            const btnText = sendBtn.querySelector('.btn-text');
-            const btnLoader = sendBtn.querySelector('.btn-loader');
-
-            let message = '';
-            let customCode = customCodeInput.value.trim();
-            let isTemplate = false;
-
-            if (activeTab === 'simple') {
-                message = messageInput.value.trim();
-            } else if (activeTab === 'template') {
-                message = templateInput.value.trim();
-                isTemplate = true;
-
-                // Parse dynamic elements
-                const elementsInput = dynamicElementsInput.value.trim();
-                if (elementsInput) {
-                    dynamicElements = await parseDynamicElements(elementsInput);
-                    if (!Array.isArray(dynamicElements) || dynamicElements.length === 0) {
-                        log('No valid dynamic elements found', 'warning');
-                        return;
-                    }
-                }
-
-                // Check if batch processing is enabled
-                isLooping = document.getElementById('loop-checkbox').checked;
-                if (isLooping) {
-                    document.getElementById('stop-batch-btn').style.display = 'inline-block';
-                }
-            } else if (activeTab === 'chain') {
-                // Run the chain using dynamic elements as batch context
-                const chainInput = document.getElementById('chain-json-input');
-                try {
-                    const chain = JSON.parse(chainInput.value.trim());
-                    chainDefinition = chain;
-                    saveToStorage(STORAGE_KEYS.chainDef, chainInput.value.trim());
-                } catch (e) {
-                    log('Invalid Chain JSON: ' + e.message, 'error');
-                    return;
-                }
-
-                // Parse dynamic elements
-                const elementsInput = dynamicElementsInput.value.trim();
-                if (elementsInput) {
-                    dynamicElements = await parseDynamicElements(elementsInput);
-                } else {
-                    dynamicElements = [];
-                }
-
-                await runChainWithBatch();
-                return; // handled by chain engine
-            } else {
-                message = messageInput.value.trim() || templateInput.value.trim();
-            }
-
-            if (!message) {
-                log('Please enter a message', 'warning');
-                return;
-            }
-
-            // Update button state
-            sendBtn.disabled = true;
-            btnText.style.display = 'none';
-            btnLoader.style.display = 'inline-flex';
-
-            try {
-                await processMessage(message, customCode, isTemplate);
-            } finally {
-                sendBtn.disabled = false;
-                btnText.style.display = 'inline';
-                btnLoader.style.display = 'none';
-
-                if (!isLooping) {
-                    document.getElementById('stop-batch-btn').style.display = 'none';
-                }
-            }
-        });
-
-    // Stop batch button
-        document.getElementById('stop-batch-btn').addEventListener('click', () => {
-            stopBatchProcessing();
-            document.getElementById('stop-batch-btn').style.display = 'none';
-        });
-
         // Auto-remove processed items checkbox
-        document.getElementById('auto-remove-checkbox').addEventListener('change', (e) => {
-            autoRemoveProcessed = e.target.checked;
-            log(`Auto-remove processed items: ${autoRemoveProcessed ? 'enabled' : 'disabled'}`);
-            saveToStorage(STORAGE_KEYS.autoRemove, autoRemoveProcessed);
-        });
-
         // New chat per item checkbox
         document.getElementById('new-chat-checkbox').addEventListener('change', (e) => {
             newChatPerItem = e.target.checked;
@@ -2179,43 +1872,6 @@
                 e.target.value = batchWaitTime;
                 log('Invalid wait time, keeping current value', 'warning');
             }
-        });
-
-        // Clear button
-        document.getElementById('clear-btn').addEventListener('click', () => {
-            messageInput.value = '';
-            customCodeInput.value = '';
-            templateInput.value = '';
-            dynamicElementsInput.value = '';
-            document.getElementById('loop-checkbox').checked = false;
-            log('Form cleared');
-
-            // Persist cleared state
-            try {
-                GM_setValue(STORAGE_KEYS.messageInput, '');
-                GM_setValue(STORAGE_KEYS.customCodeInput, '');
-                GM_setValue(STORAGE_KEYS.templateInput, '');
-                GM_setValue(STORAGE_KEYS.dynamicElementsInput, '');
-                GM_setValue(STORAGE_KEYS.loop, false);
-            } catch { }
-        });
-
-        // Toggle log button
-        document.getElementById('toggle-log-btn').addEventListener('click', () => {
-            const logElement = document.getElementById('log-container');
-            // Instead of fully hiding, toggle between compact and expanded heights
-            const compact = logElement.dataset.compact === 'true';
-            logElement.dataset.compact = (!compact).toString();
-            if (compact) {
-                logElement.style.maxHeight = '220px';
-                log('Log expanded');
-            } else {
-                logElement.style.maxHeight = '120px';
-                log('Log compact');
-            }
-
-            // Auto-resize container after log visibility change
-            setTimeout(() => autoResizeContainer(), 100);
         });
 
         // Clear log button
@@ -2255,7 +1911,7 @@
                 mainContainer.style.height = '120px';
                 // Ensure log area remains usable but small
                 const logCont = document.querySelector('#log-container');
-                if (logCont) logCont.style.maxHeight = '48px';
+                if (logCont) logCont.style.flex = '0 0 48px';
             } else {
                 mainContainer.classList.remove('minimized');
                 // Restore previous height or auto-resize
@@ -2266,7 +1922,7 @@
                     setTimeout(() => autoResizeContainer(), 100);
                 }
                 const logCont = document.querySelector('#log-container');
-                if (logCont) logCont.style.maxHeight = '';
+                if (logCont) logCont.style.flex = '1 0 160px';
             }
             saveUIState(true); // Immediate save for user action
         });
@@ -2358,14 +2014,6 @@ if (response.includes('error')) {
 
         // Keyboard shortcuts
         document.addEventListener('keydown', (e) => {
-            // Ctrl/Cmd + Enter to send
-            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-                if ([messageInput, customCodeInput, templateInput, dynamicElementsInput].includes(document.activeElement)) {
-                    document.getElementById('send-btn').click();
-                    e.preventDefault();
-                }
-            }
-
             // Escape to minimize
             if (e.key === 'Escape' && mainContainer.contains(document.activeElement)) {
                 document.getElementById('minimize-btn').click();
@@ -2521,7 +2169,7 @@ if (response.includes('error')) {
             log(`Default visibility ${CONFIG.DEFAULT_VISIBLE ? 'ON' : 'OFF'}`);
         });
 
-        // Chain UI: basic actions
+        // Composer UI: basic actions
         const chainInput = document.getElementById('chain-json-input');
         const chainCards = document.getElementById('chain-cards');
         const refreshChainCards = () => {
@@ -2529,7 +2177,14 @@ if (response.includes('error')) {
             chainCards.innerHTML = '';
             let chain;
             try { chain = JSON.parse(chainInput.value || '{}'); } catch { chain = null; }
-            if (!chain || !Array.isArray(chain.steps)) return;
+            if (!chain || !Array.isArray(chain.steps) || chain.steps.length === 0) {
+                const empty = document.createElement('div');
+                empty.className = 'empty-chain';
+                empty.innerHTML = `<div>No steps defined</div><button class="btn btn-primary" id="add-first-step-btn">Add Step</button>`;
+                chainCards.appendChild(empty);
+                document.getElementById('add-first-step-btn').addEventListener('click', () => document.getElementById('add-step-btn').click());
+                return;
+            }
             chain.steps.forEach(step => {
                 const card = document.createElement('div');
                 card.className = 'chain-card';
@@ -2539,9 +2194,17 @@ if (response.includes('error')) {
                     <div class="meta">type: ${step.type}${step.next ? ` → ${step.next}` : ''}</div>
                     <div class="actions">
                         <button class="btn btn-secondary btn-sm" data-action="edit">Edit</button>
+                        <button class="btn btn-danger btn-sm" data-action="delete">Delete</button>
                     </div>
                 `;
                 card.querySelector('[data-action="edit"]').addEventListener('click', () => openStepEditor(step.id));
+                card.querySelector('[data-action="delete"]').addEventListener('click', () => {
+                    chain.steps = chain.steps.filter(s => s.id !== step.id);
+                    chain.steps.forEach(s => { if (s.next === step.id) s.next = ''; });
+                    chainInput.value = JSON.stringify(chain, null, 2);
+                    saveToStorage(STORAGE_KEYS.chainDef, chainInput.value);
+                    refreshChainCards();
+                });
                 chainCards.appendChild(card);
             });
         };
@@ -2552,7 +2215,7 @@ if (response.includes('error')) {
             if (!Array.isArray(chain.steps)) chain.steps = [];
             let step = chain.steps.find(s => s.id === stepId);
             if (!step) {
-                step = { id: stepId || `step-${Date.now()}`, type: 'prompt', title: '', template: '' };
+                step = { id: stepId || `step-${Date.now()}`, type: 'simple', title: '', message: '' };
                 chain.steps.push(step);
             }
             const modal = document.getElementById('chain-step-modal');
@@ -2561,14 +2224,15 @@ if (response.includes('error')) {
             // Populate fields
             document.getElementById('step-id-input').value = step.id || '';
             document.getElementById('step-title-input').value = step.title || '';
-            document.getElementById('step-type-select').value = step.type || 'prompt';
-            document.getElementById('step-template-input').value = step.template || '';
+            document.getElementById('step-type-select').value = step.type || 'simple';
+            document.getElementById('message-input').value = step.message || '';
+            document.getElementById('template-input').value = step.template || '';
+            document.getElementById('dynamic-elements-input').value = step.elements || '';
             document.getElementById('step-http-url').value = step.url || '';
             document.getElementById('step-http-method').value = (step.method || 'GET').toUpperCase();
             document.getElementById('step-http-headers').value = step.headers ? JSON.stringify(step.headers) : '';
             document.getElementById('step-http-body').value = step.bodyTemplate || '';
-            document.getElementById('step-js-code').value = step.code || '';
-            document.getElementById('step-subbatch-path').value = step.path || '';
+            document.getElementById('custom-code-input').value = step.code || '';
             const nextSel = document.getElementById('step-next-select');
             nextSel.innerHTML = '<option value="">(end)</option>';
             (chain.steps||[]).forEach(s => {
@@ -2578,11 +2242,10 @@ if (response.includes('error')) {
 
             const onTypeChange = () => {
                 const type = document.getElementById('step-type-select').value;
-                // Toggle field groups
-                modal.querySelectorAll('[data-field="template"]').forEach(el => el.style.display = type === 'prompt' ? 'block' : 'none');
+                modal.querySelectorAll('[data-field="simple"]').forEach(el => el.style.display = type === 'simple' ? 'block' : 'none');
+                modal.querySelectorAll('[data-field="template"]').forEach(el => el.style.display = type === 'template' ? 'block' : 'none');
                 modal.querySelectorAll('[data-field="http"]').forEach(el => el.style.display = type === 'http' ? 'block' : 'none');
-                modal.querySelectorAll('[data-field="code"]').forEach(el => el.style.display = type === 'js' ? 'block' : 'none');
-                modal.querySelectorAll('[data-field="subbatch"]').forEach(el => el.style.display = type === 'subbatch' ? 'block' : 'none');
+                modal.querySelectorAll('[data-field="code"]').forEach(el => el.style.display = type === 'response' ? 'block' : 'none');
             };
             document.getElementById('step-type-select').onchange = onTypeChange;
             onTypeChange();
@@ -2609,13 +2272,14 @@ if (response.includes('error')) {
                 step.id = newId;
                 step.title = document.getElementById('step-title-input').value.trim();
                 step.type = document.getElementById('step-type-select').value;
-                step.template = document.getElementById('step-template-input').value;
+                step.message = document.getElementById('message-input').value;
+                step.template = document.getElementById('template-input').value;
+                step.elements = document.getElementById('dynamic-elements-input').value;
                 step.url = document.getElementById('step-http-url').value.trim();
                 step.method = document.getElementById('step-http-method').value.trim();
                 step.headers = (()=>{ try{ const v = document.getElementById('step-http-headers').value.trim(); return v? JSON.parse(v): undefined;}catch{return undefined;}})();
                 step.bodyTemplate = document.getElementById('step-http-body').value;
-                step.code = document.getElementById('step-js-code').value;
-                step.path = document.getElementById('step-subbatch-path').value.trim();
+                step.code = document.getElementById('custom-code-input').value;
                 step.next = document.getElementById('step-next-select').value;
                 chainInput.value = JSON.stringify(chain, null, 2);
                 saveToStorage(STORAGE_KEYS.chainDef, chainInput.value);
@@ -2630,7 +2294,9 @@ if (response.includes('error')) {
             try { chain = JSON.parse(chainInput.value || '{}'); } catch { chain = {}; }
             if (!chain.steps) chain.steps = [];
             const id = `step-${(chain.steps.length||0)+1}`;
-            chain.steps.push({ id, title: `Step ${chain.steps.length+1}`, type: 'prompt', template: '' });
+            chain.steps.push({ id, title: `Step ${chain.steps.length+1}`, type: 'simple', message: '' });
+            const prev = chain.steps[chain.steps.length-2];
+            if (prev && !prev.next) prev.next = id;
             if (!chain.entryId) chain.entryId = id;
             chainInput.value = JSON.stringify(chain, null, 2);
             saveToStorage(STORAGE_KEYS.chainDef, chainInput.value);
@@ -2647,22 +2313,18 @@ if (response.includes('error')) {
                 const ids = new Set(c.steps.map(s=>s.id));
                 if (!ids.has(c.entryId)) throw new Error('entryId not found among steps');
                 c.steps.forEach(s=>{ if (s.next && !ids.has(s.next)) throw new Error(`Step ${s.id} next '${s.next}' not found`); });
-                log('Chain valid');
-            } catch (e) { log('Chain invalid: ' + e.message, 'error'); }
+                log('Composer valid');
+            } catch (e) { log('Composer invalid: ' + e.message, 'error'); }
         });
 
         const runChainBtn = document.getElementById('run-chain-btn');
         if (runChainBtn) runChainBtn.addEventListener('click', async () => {
-            // Mirror Send button behavior for chain
-            const elementsInput = dynamicElementsInput.value.trim();
-            if (elementsInput) dynamicElements = await parseDynamicElements(elementsInput);
-            else dynamicElements = [];
             await runChainWithBatch();
         });
 
         const formatChainBtn = document.getElementById('format-chain-json-btn');
         if (formatChainBtn) formatChainBtn.addEventListener('click', () => {
-            try { const obj = JSON.parse(chainInput.value); chainInput.value = JSON.stringify(obj, null, 2); log('Chain JSON formatted'); saveToStorage(STORAGE_KEYS.chainDef, chainInput.value);} catch(e){ log('Invalid JSON: ' + e.message, 'error'); }
+            try { const obj = JSON.parse(chainInput.value); chainInput.value = JSON.stringify(obj, null, 2); log('Composer JSON formatted'); saveToStorage(STORAGE_KEYS.chainDef, chainInput.value);} catch(e){ log('Invalid JSON: ' + e.message, 'error'); }
         });
 
         // Change events to keep cards in sync
@@ -2673,9 +2335,14 @@ if (response.includes('error')) {
         const loadPresetSelects = () => {
             const fill = (id, map) => { const sel = document.getElementById(id); if (!sel) return; sel.innerHTML = ''; Object.keys(map||{}).sort().forEach(name=>{ const o=document.createElement('option'); o.value=name; o.textContent=name; sel.appendChild(o); }); };
             try {
-                fill('load-template-select', GM_getValue(STORAGE_KEYS.presetsTemplates, {}));
-                fill('load-chain-select', GM_getValue(STORAGE_KEYS.presetsChains, {}));
-                fill('load-js-select', GM_getValue(STORAGE_KEYS.presetsResponseJS, {}));
+                const t = GM_getValue(STORAGE_KEYS.presetsTemplates, {});
+                const c = GM_getValue(STORAGE_KEYS.presetsChains, {});
+                const j = GM_getValue(STORAGE_KEYS.presetsResponseJS, {});
+                fill('load-template-select', t);
+                fill('load-template-step-select', t);
+                fill('load-chain-select', c);
+                fill('load-js-select', j);
+                fill('load-js-step-select', j);
             } catch { }
         };
         const getPresetName = () => (document.getElementById('preset-name-input')?.value||'').trim();
@@ -2699,6 +2366,12 @@ if (response.includes('error')) {
         document.getElementById('save-js-preset-btn')?.addEventListener('click', ()=> savePreset(STORAGE_KEYS.presetsResponseJS, getPresetName(), customCodeInput.value||''));
         document.getElementById('load-js-preset-btn')?.addEventListener('click', ()=> loadPreset(STORAGE_KEYS.presetsResponseJS, 'load-js-select', v=>{ customCodeInput.value=v; saveToStorage(STORAGE_KEYS.customCodeInput, v);}));
         document.getElementById('delete-js-preset-btn')?.addEventListener('click', ()=> deletePreset(STORAGE_KEYS.presetsResponseJS, 'load-js-select'));
+        document.getElementById('save-template-step-btn')?.addEventListener('click', ()=>{ const n=prompt('Template name?'); if(n) savePreset(STORAGE_KEYS.presetsTemplates, n.trim(), document.getElementById('template-input').value||''); });
+        document.getElementById('load-template-step-btn')?.addEventListener('click', ()=> loadPreset(STORAGE_KEYS.presetsTemplates, 'load-template-step-select', v=>{ document.getElementById('template-input').value=v; }));
+        document.getElementById('delete-template-step-btn')?.addEventListener('click', ()=> deletePreset(STORAGE_KEYS.presetsTemplates, 'load-template-step-select'));
+        document.getElementById('save-js-step-btn')?.addEventListener('click', ()=>{ const n=prompt('JS name?'); if(n) savePreset(STORAGE_KEYS.presetsResponseJS, n.trim(), document.getElementById('custom-code-input').value||''); });
+        document.getElementById('load-js-step-btn')?.addEventListener('click', ()=> loadPreset(STORAGE_KEYS.presetsResponseJS, 'load-js-step-select', v=>{ document.getElementById('custom-code-input').value=v; }));
+        document.getElementById('delete-js-step-btn')?.addEventListener('click', ()=> deletePreset(STORAGE_KEYS.presetsResponseJS, 'load-js-step-select'));
     };
 
     // Run-lock utilities to avoid cross-tab collisions
@@ -2734,7 +2407,7 @@ if (response.includes('error')) {
         if (!chainDefinition) {
             try { chainDefinition = JSON.parse(document.getElementById('chain-json-input').value||'{}'); } catch { chainDefinition = null; }
         }
-        if (!chainDefinition) { log('No chain defined', 'warning'); return; }
+        if (!chainDefinition) { log('No composer defined', 'warning'); return; }
 
         if (!acquireRunLock()) {
             log('Another tab is running automation – aborting to prevent collision', 'error');
@@ -2743,23 +2416,12 @@ if (response.includes('error')) {
 
         isProcessing = true; updateStatus('processing');
         try {
-            const items = Array.isArray(dynamicElements) ? dynamicElements : [];
-            const total = Math.max(1, items.length || 1);
-            if (items.length === 0) {
-                // Single run with empty item
-                await processChain(chainDefinition, { item: null, index: 1, total });
-            } else {
-                for (let i = 0; i < items.length; i++) {
-                    const item = items[i];
-                    updateProgress(i+1, items.length);
-                    log(`🔗 Chain run for item ${i+1}/${items.length}`);
-                    await processChain(chainDefinition, { item, index: i+1, total: items.length });
-                    if (i < items.length - 1) { log(`⏱️ Waiting ${batchWaitTime}ms before next item…`); await sleep(batchWaitTime); }
-                }
-            }
-            log('🏁 Chain batch completed');
+            const items = [];
+            const total = 1;
+            await processChain(chainDefinition, { item: null, index: 1, total });
+            log('🏁 Composer batch completed');
         } catch (e) {
-            log('Chain error: ' + e.message, 'error');
+            log('Composer error: ' + e.message, 'error');
         } finally {
             releaseRunLock();
             isProcessing = false; updateStatus('idle'); updateProgress(0,0);
@@ -2783,9 +2445,8 @@ if (response.includes('error')) {
 
         while (step) {
             log(`➡️ Step ${step.id} (${step.type})`);
-            if (step.type === 'prompt') {
-                // Render template and send
-                const msg = processDynamicTemplate(step.template||'', { ...context, item: context.item, index: context.index, total: context.total });
+            if (step.type === 'simple') {
+                const msg = step.message || '';
                 await typeMessage(msg);
                 await sleep(300);
                 await sendMessage();
@@ -2795,6 +2456,23 @@ if (response.includes('error')) {
                 context.lastResponseText = resp;
                 context.chain[step.id] = { response: resp };
                 log(`📩 Step ${step.id} response (${resp.length} chars)`);
+            } else if (step.type === 'template') {
+                const arr = await parseDynamicElements(step.elements || '[]');
+                const itemsArr = Array.isArray(arr) && arr.length ? arr : [null];
+                for (let i = 0; i < itemsArr.length; i++) {
+                    const item = itemsArr[i];
+                    const msg = processDynamicTemplate(step.template || '', { ...context, item, index: i+1, total: itemsArr.length });
+                    await typeMessage(msg);
+                    await sleep(300);
+                    await sendMessage();
+                    updateStatus('waiting');
+                    const respEl = await waitForResponse();
+                    const resp = extractResponseText(respEl);
+                    const newCtx = { ...context, item, index: i+1, total: itemsArr.length, lastResponseText: resp };
+                    context.chain[step.id] = { response: resp };
+                    if (step.next) await processChain({ entryId: step.next, steps: chain.steps }, newCtx);
+                }
+                return;
             } else if (step.type === 'http') {
                 const url = processDynamicTemplate(step.url||'', context);
                 const method = (step.method||'GET').toUpperCase();
@@ -2806,22 +2484,8 @@ if (response.includes('error')) {
                 try { const j = JSON.parse(payload); payload = j; } catch { /* keep as text */ }
                 context.chain[step.id] = { http: { status: res.status, data: payload } };
                 log(`🌐 HTTP ${method} ${url} → ${res.status}`);
-            } else if (step.type === 'js') {
+            } else if (step.type === 'response') {
                 await executeCustomCode(step.code||'', context.lastResponseText || '', { elementData: context.item, index: context.index, total: context.total });
-            } else if (step.type === 'subbatch') {
-                // Expand items from a path in context
-                const getByPath = (obj, path) => { try { return path.split('.').reduce((a,p)=> a!=null ? a[p.replace(/\[|\]/g,'')] : undefined, obj); } catch { return undefined; } };
-                const arr = getByPath(context, step.path||'') || [];
-                if (Array.isArray(arr) && arr.length) {
-                    for (let i=0;i<arr.length;i++) {
-                        const child = arr[i];
-                        log(`🧩 Sub-batch ${i+1}/${arr.length} via ${step.path}`);
-                        await processChain({ entryId: chain.entryId, steps: chain.steps }, { ...context, item: child, index: i+1, total: arr.length });
-                    }
-                } else {
-                    log(`Sub-batch path yielded no items: ${step.path||'(none)'}
-                    `,'warning');
-                }
             } else {
                 log(`Unknown step type: ${step.type}`, 'warning');
             }
@@ -2850,8 +2514,6 @@ if (response.includes('error')) {
 
     // Export for external access
     window.ChatGPTAutomation = {
-        processMessage,
-        stopBatchProcessing,
         log,
         updateStatus,
         CONFIG,
