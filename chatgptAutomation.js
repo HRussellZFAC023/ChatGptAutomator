@@ -2,7 +2,7 @@
 // ==UserScript==
 // @name         ChatGPT Automation Pro
 // @namespace    http://tampermonkey.net/
-// @version      1.7
+// @version      1.8
 // @description  Advanced ChatGPT automation with dynamic templating
 // @author       Henry Russell
 // @match        https://chatgpt.com/*
@@ -803,7 +803,7 @@
                     <div class="tab-container">
                         <button class="tab-btn active" data-tab="simple">Simple</button>
                         <button class="tab-btn" data-tab="template">Template</button>
-            <button class="tab-btn" data-tab="chain">Chain</button>
+            <button class="tab-btn" data-tab="chain">Composer</button>
                         <button class="tab-btn" data-tab="advanced">Response (JS)</button>
                         <button class="tab-btn" data-tab="settings">Settings</button>
                     </div>
@@ -838,19 +838,19 @@
 
                     <div class="tab-content" id="chain-tab">
                         <div class="form-group">
-                            <label>Chain Canvas:</label>
+                            <label>Composer Canvas:</label>
                             <div id="chain-canvas" class="chain-canvas">
                                 <div class="chain-toolbar">
                                     <button class="btn btn-secondary" id="add-step-btn">Add Step</button>
-                                    <button class="btn btn-secondary" id="validate-chain-btn">Validate Chain</button>
-                                    <button class="btn btn-primary" id="run-chain-btn">Run Chain</button>
+                                    <button class="btn btn-secondary" id="validate-chain-btn">Validate Composer</button>
+                                    <button class="btn btn-primary" id="run-chain-btn">Run Composer</button>
                                 </div>
                                 <div id="chain-cards" class="chain-cards"></div>
                             </div>
-                            <div class="help-text">Visual editor for multi-step chains. Steps connect in sequence; supports nested sub-batches.</div>
+                            <div class="help-text">Visual editor for multi-step composers. Steps connect in sequence; supports nested sub-batches.</div>
                         </div>
                         <div class="form-group">
-                            <label for="chain-json-input">Chain JSON (advanced):</label>
+                            <label for="chain-json-input">Composer JSON (advanced):</label>
                             <div class="code-editor">
                                 <textarea id="chain-json-input" rows="6" placeholder='{"entryId":"step-1","steps":[{"id":"step-1","type":"prompt","title":"Create mnemonic","template":"...","next":"step-2"},{"id":"step-2","type":"prompt","title":"Create image prompt","template":"...","next":"step-3"},{"id":"step-3","type":"js","title":"Send to server","code":"// use http.postForm(...)"}]}'></textarea>
                                 <div class="editor-tools">
@@ -964,7 +964,7 @@
                                         <button class="btn btn-danger" id="delete-template-preset-btn">Delete</button>
                                     </div>
                                     <div class="preset-row">
-                                        <button class="btn btn-secondary" id="save-chain-preset-btn">Save Chain</button>
+                                        <button class="btn btn-secondary" id="save-chain-preset-btn">Save Composer</button>
                                         <select id="load-chain-select" class="settings-input"></select>
                                         <button class="btn btn-primary" id="load-chain-preset-btn">Load</button>
                                         <button class="btn btn-danger" id="delete-chain-preset-btn">Delete</button>
@@ -1029,7 +1029,7 @@
                                 <option value="prompt">prompt</option>
                                 <option value="http">http</option>
                                 <option value="js">js</option>
-                                <option value="subbatch">subbatch</option>
+                                <option value="template">template</option>
                             </select>
                         </div>
                         <div class="form-group" data-field="template">
@@ -1049,9 +1049,9 @@
                             <label for="step-js-code">JS Code</label>
                             <textarea id="step-js-code" rows="6" class="settings-input" placeholder="// code has access to response, item, index, total, http, log"></textarea>
                         </div>
-                        <div class="form-group" data-field="subbatch">
-                            <label for="step-subbatch-path">Sub-batch source path (in context)</label>
-                            <input id="step-subbatch-path" class="settings-input" placeholder="e.g., item.parts or results[]">
+                        <div class="form-group" data-field="template">
+                            <label for="step-template-path">Template source path (in context)</label>
+                            <input id="step-template-path" class="settings-input" placeholder="e.g., item.parts or results[]">
                         </div>
                         <div class="form-group">
                             <label for="step-next-select">Next step</label>
@@ -1122,7 +1122,7 @@
             }
             #chatgpt-automation-ui.minimized #log-container {
                 max-height: 48px;
-                overflow: hidden;
+                overflow-y: auto;
             }
             #chatgpt-automation-ui.minimized .log-content {
                 /* Let logs fill available space and scroll internally */
@@ -1656,7 +1656,7 @@
                 background: linear-gradient(-45deg, transparent 0%, transparent 40%, var(--border-medium, rgba(0,0,0,0.1)) 40%, var(--border-medium, rgba(0,0,0,0.1)) 60%, transparent 60%, transparent 100%);
             }
 
-            /* Chain canvas styles */
+            /* Composer canvas styles */
             #chatgpt-automation-ui .chain-canvas {
                 border: 1px dashed var(--border-light, rgba(0,0,0,0.1));
                 border-radius: 8px;
@@ -1669,6 +1669,8 @@
             #chatgpt-automation-ui .chain-card .title { font-weight:600; font-size:12px; margin-bottom:4px; }
             #chatgpt-automation-ui .chain-card .meta { font-size:11px; opacity:0.8; margin-bottom:6px; }
             #chatgpt-automation-ui .chain-card .actions { display:flex; gap:6px; }
+            #chatgpt-automation-ui .chain-placeholder { border:2px dotted var(--border-light, rgba(0,0,0,0.3)); padding:16px; border-radius:8px; background: var(--surface-secondary, #f8fafc); flex:1; text-align:center; }
+            #chatgpt-automation-ui.dark-mode .chain-placeholder { background: var(--surface-secondary, #1e1e20); }
 
             /* Modal */
             #chatgpt-automation-ui .chain-modal { position: fixed; inset:0; z-index:10001; }
@@ -2107,7 +2109,7 @@
                     chainDefinition = chain;
                     saveToStorage(STORAGE_KEYS.chainDef, chainInput.value.trim());
                 } catch (e) {
-                    log('Invalid Chain JSON: ' + e.message, 'error');
+                    log('Invalid Composer JSON: ' + e.message, 'error');
                     return;
                 }
 
@@ -2521,7 +2523,7 @@ if (response.includes('error')) {
             log(`Default visibility ${CONFIG.DEFAULT_VISIBLE ? 'ON' : 'OFF'}`);
         });
 
-        // Chain UI: basic actions
+        // Composer UI: basic actions
         const chainInput = document.getElementById('chain-json-input');
         const chainCards = document.getElementById('chain-cards');
         const refreshChainCards = () => {
@@ -2529,7 +2531,14 @@ if (response.includes('error')) {
             chainCards.innerHTML = '';
             let chain;
             try { chain = JSON.parse(chainInput.value || '{}'); } catch { chain = null; }
-            if (!chain || !Array.isArray(chain.steps)) return;
+            if (!chain || !Array.isArray(chain.steps) || chain.steps.length === 0) {
+                const empty = document.createElement('div');
+                empty.className = 'chain-placeholder';
+                empty.innerHTML = `<button class="btn btn-primary" id="add-first-step-btn">Add first step</button>`;
+                chainCards.appendChild(empty);
+                document.getElementById('add-first-step-btn')?.addEventListener('click', () => addStepBtn?.click());
+                return;
+            }
             chain.steps.forEach(step => {
                 const card = document.createElement('div');
                 card.className = 'chain-card';
@@ -2539,9 +2548,19 @@ if (response.includes('error')) {
                     <div class="meta">type: ${step.type}${step.next ? ` → ${step.next}` : ''}</div>
                     <div class="actions">
                         <button class="btn btn-secondary btn-sm" data-action="edit">Edit</button>
+                        <button class="btn btn-danger btn-sm" data-action="delete">Delete</button>
                     </div>
                 `;
                 card.querySelector('[data-action="edit"]').addEventListener('click', () => openStepEditor(step.id));
+                card.querySelector('[data-action="delete"]').addEventListener('click', () => {
+                    let c; try { c = JSON.parse(chainInput.value || '{}'); } catch { c = { steps: [] }; }
+                    if (!Array.isArray(c.steps)) c.steps = [];
+                    c.steps = c.steps.filter(s => s.id !== step.id);
+                    c.steps.forEach(s => { if (s.next === step.id) s.next = ''; });
+                    chainInput.value = JSON.stringify(c, null, 2);
+                    saveToStorage(STORAGE_KEYS.chainDef, chainInput.value);
+                    refreshChainCards();
+                });
                 chainCards.appendChild(card);
             });
         };
@@ -2568,7 +2587,7 @@ if (response.includes('error')) {
             document.getElementById('step-http-headers').value = step.headers ? JSON.stringify(step.headers) : '';
             document.getElementById('step-http-body').value = step.bodyTemplate || '';
             document.getElementById('step-js-code').value = step.code || '';
-            document.getElementById('step-subbatch-path').value = step.path || '';
+            document.getElementById('step-template-path').value = step.path || '';
             const nextSel = document.getElementById('step-next-select');
             nextSel.innerHTML = '<option value="">(end)</option>';
             (chain.steps||[]).forEach(s => {
@@ -2582,7 +2601,7 @@ if (response.includes('error')) {
                 modal.querySelectorAll('[data-field="template"]').forEach(el => el.style.display = type === 'prompt' ? 'block' : 'none');
                 modal.querySelectorAll('[data-field="http"]').forEach(el => el.style.display = type === 'http' ? 'block' : 'none');
                 modal.querySelectorAll('[data-field="code"]').forEach(el => el.style.display = type === 'js' ? 'block' : 'none');
-                modal.querySelectorAll('[data-field="subbatch"]').forEach(el => el.style.display = type === 'subbatch' ? 'block' : 'none');
+                modal.querySelectorAll('[data-field="template"]').forEach(el => el.style.display = type === 'template' ? 'block' : 'none');
             };
             document.getElementById('step-type-select').onchange = onTypeChange;
             onTypeChange();
@@ -2615,7 +2634,7 @@ if (response.includes('error')) {
                 step.headers = (()=>{ try{ const v = document.getElementById('step-http-headers').value.trim(); return v? JSON.parse(v): undefined;}catch{return undefined;}})();
                 step.bodyTemplate = document.getElementById('step-http-body').value;
                 step.code = document.getElementById('step-js-code').value;
-                step.path = document.getElementById('step-subbatch-path').value.trim();
+                step.path = document.getElementById('step-template-path').value.trim();
                 step.next = document.getElementById('step-next-select').value;
                 chainInput.value = JSON.stringify(chain, null, 2);
                 saveToStorage(STORAGE_KEYS.chainDef, chainInput.value);
@@ -2631,6 +2650,10 @@ if (response.includes('error')) {
             if (!chain.steps) chain.steps = [];
             const id = `step-${(chain.steps.length||0)+1}`;
             chain.steps.push({ id, title: `Step ${chain.steps.length+1}`, type: 'prompt', template: '' });
+            if (chain.steps.length > 1) {
+                const prev = chain.steps[chain.steps.length - 2];
+                if (!prev.next) prev.next = id;
+            }
             if (!chain.entryId) chain.entryId = id;
             chainInput.value = JSON.stringify(chain, null, 2);
             saveToStorage(STORAGE_KEYS.chainDef, chainInput.value);
@@ -2647,8 +2670,8 @@ if (response.includes('error')) {
                 const ids = new Set(c.steps.map(s=>s.id));
                 if (!ids.has(c.entryId)) throw new Error('entryId not found among steps');
                 c.steps.forEach(s=>{ if (s.next && !ids.has(s.next)) throw new Error(`Step ${s.id} next '${s.next}' not found`); });
-                log('Chain valid');
-            } catch (e) { log('Chain invalid: ' + e.message, 'error'); }
+                log('Composer valid');
+            } catch (e) { log('Composer invalid: ' + e.message, 'error'); }
         });
 
         const runChainBtn = document.getElementById('run-chain-btn');
@@ -2662,7 +2685,7 @@ if (response.includes('error')) {
 
         const formatChainBtn = document.getElementById('format-chain-json-btn');
         if (formatChainBtn) formatChainBtn.addEventListener('click', () => {
-            try { const obj = JSON.parse(chainInput.value); chainInput.value = JSON.stringify(obj, null, 2); log('Chain JSON formatted'); saveToStorage(STORAGE_KEYS.chainDef, chainInput.value);} catch(e){ log('Invalid JSON: ' + e.message, 'error'); }
+            try { const obj = JSON.parse(chainInput.value); chainInput.value = JSON.stringify(obj, null, 2); log('Composer JSON formatted'); saveToStorage(STORAGE_KEYS.chainDef, chainInput.value);} catch(e){ log('Invalid JSON: ' + e.message, 'error'); }
         });
 
         // Change events to keep cards in sync
@@ -2752,14 +2775,14 @@ if (response.includes('error')) {
                 for (let i = 0; i < items.length; i++) {
                     const item = items[i];
                     updateProgress(i+1, items.length);
-                    log(`🔗 Chain run for item ${i+1}/${items.length}`);
+                    log(`🔗 Composer run for item ${i+1}/${items.length}`);
                     await processChain(chainDefinition, { item, index: i+1, total: items.length });
                     if (i < items.length - 1) { log(`⏱️ Waiting ${batchWaitTime}ms before next item…`); await sleep(batchWaitTime); }
                 }
             }
-            log('🏁 Chain batch completed');
+            log('🏁 Composer batch completed');
         } catch (e) {
-            log('Chain error: ' + e.message, 'error');
+            log('Composer error: ' + e.message, 'error');
         } finally {
             releaseRunLock();
             isProcessing = false; updateStatus('idle'); updateProgress(0,0);
@@ -2808,19 +2831,19 @@ if (response.includes('error')) {
                 log(`🌐 HTTP ${method} ${url} → ${res.status}`);
             } else if (step.type === 'js') {
                 await executeCustomCode(step.code||'', context.lastResponseText || '', { elementData: context.item, index: context.index, total: context.total });
-            } else if (step.type === 'subbatch') {
+            } else if (step.type === 'template') {
                 // Expand items from a path in context
                 const getByPath = (obj, path) => { try { return path.split('.').reduce((a,p)=> a!=null ? a[p.replace(/\[|\]/g,'')] : undefined, obj); } catch { return undefined; } };
                 const arr = getByPath(context, step.path||'') || [];
                 if (Array.isArray(arr) && arr.length) {
                     for (let i=0;i<arr.length;i++) {
                         const child = arr[i];
-                        log(`🧩 Sub-batch ${i+1}/${arr.length} via ${step.path}`);
+                        log(`🧩 Template ${i+1}/${arr.length} via ${step.path}`);
                         await processChain({ entryId: chain.entryId, steps: chain.steps }, { ...context, item: child, index: i+1, total: arr.length });
                     }
                 } else {
-                    log(`Sub-batch path yielded no items: ${step.path||'(none)'}
-                    `,'warning');
+                        log(`Template path yielded no items: ${step.path||'(none)'}
+                        `,'warning');
                 }
             } else {
                 log(`Unknown step type: ${step.type}`, 'warning');
