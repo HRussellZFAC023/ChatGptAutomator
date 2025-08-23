@@ -1,0 +1,20 @@
+# Test files
+test.html
+
+# Dependencies 
+node_modules/
+npm-debug.log*
+
+# Build artifacts
+dist/
+build/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
