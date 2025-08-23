@@ -2,7 +2,7 @@
 // ==UserScript==
 // @name         ChatGPT Automation Pro
 // @namespace    http://tampermonkey.net/
-// @version      1.8
+// @version      1.9
 // @description  Advanced ChatGPT automation with dynamic templating
 // @author       Henry Russell
 // @match        https://chatgpt.com/*
@@ -650,6 +650,34 @@
                                 </div>
                             </div>
                         </div>
+                        <div class="form-group">
+                            <label>Presets:</label>
+                            <div class="presets-grid">
+                                <div class="preset-block">
+                                    <div class="preset-row">
+                                        <input type="text" id="preset-name-input" class="settings-input" placeholder="Preset name">
+                                    </div>
+                                    <div class="preset-row">
+                                        <button class="btn btn-secondary" id="save-template-preset-btn">Save Template</button>
+                                        <select id="load-template-select" class="settings-input"></select>
+                                        <button class="btn btn-primary" id="load-template-preset-btn">Load</button>
+                                        <button class="btn btn-danger" id="delete-template-preset-btn">Delete</button>
+                                    </div>
+                                    <div class="preset-row">
+                                        <button class="btn btn-secondary" id="save-chain-preset-btn">Save Chain</button>
+                                        <select id="load-chain-select" class="settings-input"></select>
+                                        <button class="btn btn-primary" id="load-chain-preset-btn">Load</button>
+                                        <button class="btn btn-danger" id="delete-chain-preset-btn">Delete</button>
+                                    </div>
+                                    <div class="preset-row">
+                                        <button class="btn btn-secondary" id="save-js-preset-btn">Save Response JS</button>
+                                        <select id="load-js-select" class="settings-input"></select>
+                                        <button class="btn btn-primary" id="load-js-preset-btn">Load</button>
+                                        <button class="btn btn-danger" id="delete-js-preset-btn">Delete</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     <div class="tab-content" id="settings-tab">
                         <div class="form-group">
@@ -714,34 +742,6 @@
                                 Show panel by default
                             </label>
                             <div class="help-text">Controls default visibility on page load. You can still toggle from the header button.</div>
-                        </div>
-                        <div class="form-group">
-                            <label>Presets:</label>
-                            <div class="presets-grid">
-                                <div class="preset-block">
-                                    <div class="preset-row">
-                                        <input type="text" id="preset-name-input" class="settings-input" placeholder="Preset name">
-                                    </div>
-                                    <div class="preset-row">
-                                        <button class="btn btn-secondary" id="save-template-preset-btn">Save Template</button>
-                                        <select id="load-template-select" class="settings-input"></select>
-                                        <button class="btn btn-primary" id="load-template-preset-btn">Load</button>
-                                        <button class="btn btn-danger" id="delete-template-preset-btn">Delete</button>
-                                    </div>
-                                    <div class="preset-row">
-                                        <button class="btn btn-secondary" id="save-chain-preset-btn">Save Chain</button>
-                                        <select id="load-chain-select" class="settings-input"></select>
-                                        <button class="btn btn-primary" id="load-chain-preset-btn">Load</button>
-                                        <button class="btn btn-danger" id="delete-chain-preset-btn">Delete</button>
-                                    </div>
-                                    <div class="preset-row">
-                                        <button class="btn btn-secondary" id="save-js-preset-btn">Save Response JS</button>
-                                        <select id="load-js-select" class="settings-input"></select>
-                                        <button class="btn btn-primary" id="load-js-preset-btn">Load</button>
-                                        <button class="btn btn-danger" id="delete-js-preset-btn">Delete</button>
-                                    </div>
-                                </div>
-                            </div>
                         </div>
                     </div>
 
@@ -828,6 +828,34 @@
                             </div>
                         </div>
                         <div class="form-group">
+                            <label>Presets:</label>
+                            <div class="presets-grid">
+                                <div class="preset-block">
+                                    <div class="preset-row">
+                                        <input type="text" id="modal-preset-name-input" class="settings-input" placeholder="Preset name">
+                                    </div>
+                                    <div class="preset-row">
+                                        <button class="btn btn-secondary" id="modal-save-template-preset-btn">Save Template</button>
+                                        <select id="modal-load-template-select" class="settings-input"></select>
+                                        <button class="btn btn-primary" id="modal-load-template-preset-btn">Load</button>
+                                        <button class="btn btn-danger" id="modal-delete-template-preset-btn">Delete</button>
+                                    </div>
+                                    <div class="preset-row">
+                                        <button class="btn btn-secondary" id="modal-save-chain-preset-btn">Save Chain</button>
+                                        <select id="modal-load-chain-select" class="settings-input"></select>
+                                        <button class="btn btn-primary" id="modal-load-chain-preset-btn">Load</button>
+                                        <button class="btn btn-danger" id="modal-delete-chain-preset-btn">Delete</button>
+                                    </div>
+                                    <div class="preset-row">
+                                        <button class="btn btn-secondary" id="modal-save-js-preset-btn">Save Response JS</button>
+                                        <select id="modal-load-js-select" class="settings-input"></select>
+                                        <button class="btn btn-primary" id="modal-load-js-preset-btn">Load</button>
+                                        <button class="btn btn-danger" id="modal-delete-js-preset-btn">Delete</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-group">
                             <label for="step-next-select">Next step</label>
                             <select id="step-next-select" class="settings-input"></select>
                         </div>
@@ -895,11 +923,10 @@
                 height: 100%;
             }
             #chatgpt-automation-ui.minimized #log-container {
-                max-height: 48px;
-                overflow: hidden;
+                flex: 1 1 auto;
+                overflow-y: auto;
             }
             #chatgpt-automation-ui.minimized .log-content {
-                /* Let logs fill available space and scroll internally */
                 flex: 1 1 auto;
                 overflow-y: auto;
             }
@@ -1352,7 +1379,7 @@
 
             #chatgpt-automation-ui .automation-log {
                 border-top: 1px solid var(--border-light, rgba(0,0,0,0.06));
-                flex: 0 0 160px;
+                flex: 1 1 160px;
                 display: flex;
                 flex-direction: column;
                 overflow: auto;
@@ -1437,6 +1464,9 @@
             }
             #chatgpt-automation-ui .chain-toolbar { display:flex; gap:8px; margin-bottom:8px; flex-wrap:wrap; }
             #chatgpt-automation-ui .chain-cards { display:flex; gap:8px; flex-wrap:wrap; align-items:flex-start; }
+            #chatgpt-automation-ui .chain-empty { border:2px dashed var(--border-light, rgba(0,0,0,0.2)); padding:24px; border-radius:8px; background: var(--surface-secondary, #f8fafc); color: var(--text-secondary, #6b7280); text-align:center; flex:1; }
+            #chatgpt-automation-ui.dark-mode .chain-empty { background: var(--surface-secondary, #1e1e20); border-color: rgba(255,255,255,0.2); }
+            #chatgpt-automation-ui .chain-empty button { margin-top:8px; }
             #chatgpt-automation-ui .chain-card { background: var(--surface-secondary, #f8fafc); border:1px solid var(--border-light, rgba(0,0,0,0.06)); border-radius:8px; padding:8px; min-width:140px; max-width:200px; position:relative; }
             #chatgpt-automation-ui.dark-mode .chain-card { background: var(--surface-secondary, #1e1e20); border-color: var(--border-light, rgba(255,255,255,0.06)); }
             #chatgpt-automation-ui .chain-card .title { font-weight:600; font-size:12px; margin-bottom:4px; }
@@ -2162,7 +2192,11 @@ if (response.includes('error')) {
             chainCards.innerHTML = '';
             let chain;
             try { chain = JSON.parse(chainInput.value || '{}'); } catch { chain = null; }
-            if (!chain || !Array.isArray(chain.steps)) return;
+            if (!chain || !Array.isArray(chain.steps) || chain.steps.length === 0) {
+                chainCards.innerHTML = `<div class="chain-empty"><div>No steps defined</div><button class="btn btn-primary" id="empty-add-step-btn">Add first step</button></div>`;
+                document.getElementById('empty-add-step-btn')?.addEventListener('click', () => addStepBtn.click());
+                return;
+            }
             chain.steps.forEach(step => {
                 const card = document.createElement('div');
                 card.className = 'chain-card';
@@ -2217,6 +2251,13 @@ if (response.includes('error')) {
                 const opt = document.createElement('option');
                 opt.value = s.id; opt.textContent = s.id; if (step.next === s.id) opt.selected = true; nextSel.appendChild(opt);
             });
+            if (!step.next) {
+                const idx = (chain.steps||[]).findIndex(s=>s.id===step.id);
+                if (idx >=0 && chain.steps[idx+1]) {
+                    step.next = chain.steps[idx+1].id;
+                    nextSel.value = step.next;
+                }
+            }
 
             const onTypeChange = () => {
                 const type = document.getElementById('step-type-select').value;
@@ -2321,10 +2362,10 @@ if (response.includes('error')) {
         const getPresetName = () => (document.getElementById('preset-name-input')?.value||'').trim();
         const savePreset = (storeKey, name, value) => {
             if (!name) return log('Enter a preset name', 'warning');
-            try { const map = GM_getValue(storeKey, {}) || {}; map[name] = value; GM_setValue(storeKey, map); loadPresetSelects(); log('Preset saved'); } catch(e){ log('Save failed: '+e.message, 'error'); }
+            try { const map = GM_getValue(storeKey, {}) || {}; map[name] = value; GM_setValue(storeKey, map); loadPresetSelects(); loadModalPresetSelects(); log('Preset saved'); } catch(e){ log('Save failed: '+e.message, 'error'); }
         };
         const deletePreset = (storeKey, selId) => {
-            try { const sel = document.getElementById(selId); if(!sel||!sel.value) return; const map = GM_getValue(storeKey, {}) || {}; delete map[sel.value]; GM_setValue(storeKey, map); loadPresetSelects(); log('Preset deleted'); } catch(e){ log('Delete failed: '+e.message, 'error'); }
+            try { const sel = document.getElementById(selId); if(!sel||!sel.value) return; const map = GM_getValue(storeKey, {}) || {}; delete map[sel.value]; GM_setValue(storeKey, map); loadPresetSelects(); loadModalPresetSelects(); log('Preset deleted'); } catch(e){ log('Delete failed: '+e.message, 'error'); }
         };
         const loadPreset = (storeKey, selId, apply) => {
             try { const sel = document.getElementById(selId); const map = GM_getValue(storeKey, {}) || {}; const v = map[sel.value]; if (v==null) return; apply(v); log('Preset loaded'); } catch(e){ log('Load failed: '+e.message, 'error'); }
@@ -2339,6 +2380,26 @@ if (response.includes('error')) {
         document.getElementById('save-js-preset-btn')?.addEventListener('click', ()=> savePreset(STORAGE_KEYS.presetsResponseJS, getPresetName(), customCodeInput.value||''));
         document.getElementById('load-js-preset-btn')?.addEventListener('click', ()=> loadPreset(STORAGE_KEYS.presetsResponseJS, 'load-js-select', v=>{ customCodeInput.value=v; saveToStorage(STORAGE_KEYS.customCodeInput, v);}));
         document.getElementById('delete-js-preset-btn')?.addEventListener('click', ()=> deletePreset(STORAGE_KEYS.presetsResponseJS, 'load-js-select'));
+        // Modal preset wiring
+        const loadModalPresetSelects = () => {
+            const fill = (id, map) => { const sel = document.getElementById(id); if (!sel) return; sel.innerHTML=''; Object.keys(map||{}).sort().forEach(name=>{ const o=document.createElement('option'); o.value=name; o.textContent=name; sel.appendChild(o); }); };
+            try {
+                fill('modal-load-template-select', GM_getValue(STORAGE_KEYS.presetsTemplates, {}));
+                fill('modal-load-chain-select', GM_getValue(STORAGE_KEYS.presetsChains, {}));
+                fill('modal-load-js-select', GM_getValue(STORAGE_KEYS.presetsResponseJS, {}));
+            } catch { }
+        };
+        loadModalPresetSelects();
+        const getModalPresetName = () => (document.getElementById('modal-preset-name-input')?.value||'').trim();
+        document.getElementById('modal-save-template-preset-btn')?.addEventListener('click', ()=> savePreset(STORAGE_KEYS.presetsTemplates, getModalPresetName(), templateInput.value||''));
+        document.getElementById('modal-load-template-preset-btn')?.addEventListener('click', ()=> loadPreset(STORAGE_KEYS.presetsTemplates, 'modal-load-template-select', v=>{ templateInput.value=v; saveToStorage(STORAGE_KEYS.templateInput, v);}));
+        document.getElementById('modal-delete-template-preset-btn')?.addEventListener('click', ()=> deletePreset(STORAGE_KEYS.presetsTemplates, 'modal-load-template-select'));
+        document.getElementById('modal-save-chain-preset-btn')?.addEventListener('click', ()=> savePreset(STORAGE_KEYS.presetsChains, getModalPresetName(), document.getElementById('chain-json-input').value||''));
+        document.getElementById('modal-load-chain-preset-btn')?.addEventListener('click', ()=> loadPreset(STORAGE_KEYS.presetsChains, 'modal-load-chain-select', v=>{ document.getElementById('chain-json-input').value=v; saveToStorage(STORAGE_KEYS.chainDef, v); }));
+        document.getElementById('modal-delete-chain-preset-btn')?.addEventListener('click', ()=> deletePreset(STORAGE_KEYS.presetsChains, 'modal-load-chain-select'));
+        document.getElementById('modal-save-js-preset-btn')?.addEventListener('click', ()=> savePreset(STORAGE_KEYS.presetsResponseJS, getModalPresetName(), customCodeInput.value||''));
+        document.getElementById('modal-load-js-preset-btn')?.addEventListener('click', ()=> loadPreset(STORAGE_KEYS.presetsResponseJS, 'modal-load-js-select', v=>{ customCodeInput.value=v; saveToStorage(STORAGE_KEYS.customCodeInput, v);}));
+        document.getElementById('modal-delete-js-preset-btn')?.addEventListener('click', ()=> deletePreset(STORAGE_KEYS.presetsResponseJS, 'modal-load-js-select'));
     };
 
     // Run-lock utilities to avoid cross-tab collisions
