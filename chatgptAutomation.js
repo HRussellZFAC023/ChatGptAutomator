@@ -1100,13 +1100,17 @@
                 height: 100%;
             }
             #chatgpt-automation-ui.minimized #log-container {
-                max-height: 48px;
-                overflow: hidden;
+                max-height: none;
+                overflow: visible;
+                flex: 1;
+                display: flex;
+                flex-direction: column;
             }
             #chatgpt-automation-ui.minimized .log-content {
                 /* Let logs fill available space and scroll internally */
                 flex: 1 1 auto;
                 overflow-y: auto;
+                max-height: calc(100vh - 200px);
             }
             #chatgpt-automation-ui.minimized .automation-header {
                 position: sticky;
@@ -2276,11 +2280,9 @@
                 // Save previous explicit height if present
                 _previousHeight = mainContainer.style.height || null;
                 mainContainer.classList.add('minimized');
-                // Set a compact height so logs become smaller
-                mainContainer.style.height = '120px';
-                // Ensure log area remains usable but small
-                const logCont = document.querySelector('#log-container');
-                if (logCont) logCont.style.maxHeight = '48px';
+                // Set a compact height for minimized view
+                mainContainer.style.height = '180px';
+                mainContainer.style.minHeight = '180px';
             } else {
                 mainContainer.classList.remove('minimized');
                 // Restore previous height or auto-resize
@@ -2288,10 +2290,9 @@
                     mainContainer.style.height = _previousHeight;
                 } else {
                     mainContainer.style.height = '';
+                    mainContainer.style.minHeight = '';
                     setTimeout(() => autoResizeContainer(), 100);
                 }
-                const logCont = document.querySelector('#log-container');
-                if (logCont) logCont.style.maxHeight = '';
             }
             saveUIState(true); // Immediate save for user action
         });
@@ -2328,7 +2329,7 @@
             }
         });
 
-        // Template tab JS check and snippet
+        // Dynamic elements JS validation and snippet
         const elSyntaxBtn = document.getElementById('elements-syntax-check-btn');
         if (elSyntaxBtn) {
             elSyntaxBtn.addEventListener('click', async () => {
@@ -2575,8 +2576,9 @@ if (response.includes('error')) {
                         let chain;
                         try { chain = JSON.parse(chainInput.value || '{}'); } catch { chain = {}; }
                         if (!chain.steps) chain.steps = [];
-                        const id = `step-${(chain.steps.length||0)+1}`;
-                        chain.steps.push({ id, title: `Step ${chain.steps.length+1}`, type: 'prompt', template: '' });
+                        const id = `step-1`;
+                        const newStep = { id, title: `Step 1`, type: 'simple', template: '', message: '' };
+                        chain.steps.push(newStep);
                         if (!chain.entryId) chain.entryId = id;
                         chainInput.value = JSON.stringify(chain, null, 2);
                         saveToStorage(STORAGE_KEYS.chainDef, chainInput.value);
@@ -2667,7 +2669,7 @@ if (response.includes('error')) {
             
             const onTypeChange = () => {
                 const type = document.getElementById('step-type-select').value;
-                // Toggle field groups for new types
+                // Toggle field visibility based on step type selection
                 modal.querySelectorAll('[data-field="simple"]').forEach(el => el.style.display = type === 'simple' ? 'block' : 'none');
                 modal.querySelectorAll('[data-field="template"]').forEach(el => el.style.display = ['template', 'prompt'].includes(type) ? 'block' : 'none');
                 modal.querySelectorAll('[data-field="response-js"]').forEach(el => el.style.display = type === 'response-js' ? 'block' : 'none');
@@ -2722,7 +2724,18 @@ if (response.includes('error')) {
             try { chain = JSON.parse(chainInput.value || '{}'); } catch { chain = {}; }
             if (!chain.steps) chain.steps = [];
             const id = `step-${(chain.steps.length||0)+1}`;
-            chain.steps.push({ id, title: `Step ${chain.steps.length+1}`, type: 'prompt', template: '' });
+            const newStep = { id, title: `Step ${chain.steps.length+1}`, type: 'prompt', template: '' };
+            
+            // Auto-populate next step connections
+            if (chain.steps.length > 0) {
+                // Find the last step that doesn't have a next connection
+                const unconnectedStep = chain.steps.find(s => !s.next);
+                if (unconnectedStep) {
+                    unconnectedStep.next = id;
+                }
+            }
+            
+            chain.steps.push(newStep);
             if (!chain.entryId) chain.entryId = id;
             chainInput.value = JSON.stringify(chain, null, 2);
             saveToStorage(STORAGE_KEYS.chainDef, chainInput.value);
