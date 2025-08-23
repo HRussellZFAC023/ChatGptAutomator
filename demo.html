@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChatGPT Automator UI Demo</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f6f6f6;
+        }
+        .demo-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        h1, h2 {
+            color: #333;
+        }
+        .note {
+            background: #e3f2fd;
+            padding: 10px;
+            border-radius: 4px;
+            border-left: 4px solid #2196f3;
+            margin: 10px 0;
+        }
+        .launch-btn {
+            background: #6366f1;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            margin: 10px 0;
+        }
+        .launch-btn:hover {
+            background: #5855eb;
+        }
+    </style>
+</head>
+<body>
+    <h1>ChatGPT Automator UI Demo</h1>
+    
+    <div class="demo-container">
+        <h2>New UI Structure</h2>
+        <p>This demo shows the restructured ChatGPT Automator interface with the new simplified navigation.</p>
+        <div class="note">
+            <strong>Key Changes:</strong><br>
+            • Main tabs simplified to just "Composer" and "Settings"<br>
+            • Templates, Simple, and Response (JS) moved to step editor popup<br>
+            • Empty state with "Add First Step" button<br>
+            • Delete buttons on each step card<br>
+            • Preset dropdowns in both main interface and popup
+        </div>
+        
+        <button class="launch-btn" onclick="createAutomationUI()">Launch Automation Interface</button>
+        
+        <!-- Mock page header for the launcher -->
+        <div id="page-header" style="display: none;">
+            <div id="conversation-header-actions"></div>
+        </div>
+    </div>
+
+    <script>
+        // Mock Greasemonkey functions
+        window.GM_setValue = window.GM_setValue || ((key, value) => localStorage.setItem('gm_' + key, JSON.stringify(value)));
+        window.GM_getValue = window.GM_getValue || ((key, defaultValue) => {
+            const stored = localStorage.getItem('gm_' + key);
+            return stored ? JSON.parse(stored) : defaultValue;
+        });
+        window.GM_xmlhttpRequest = window.GM_xmlhttpRequest || (() => {});
+
+        // Function to manually create and show the UI
+        function createAutomationUI() {
+            // Import the automation script functionality manually
+            const script = document.createElement('script');
+            script.textContent = `
+                // Mock the userscript environment
+                (function() {
+                    'use strict';
+                    
+                    // Force creation of the UI
+                    window.createUIForDemo = function() {
+                        // Add the UI to body
+                        if (!document.getElementById('chatgpt-automation-ui')) {
+                            const uiHTML = \`${getUIHTML()}\`;
+                            document.body.insertAdjacentHTML('beforeend', uiHTML);
+                            
+                            // Show the UI
+                            const ui = document.getElementById('chatgpt-automation-ui');
+                            if (ui) {
+                                ui.style.display = 'block';
+                                ui.style.position = 'fixed';
+                                ui.style.top = '20px';
+                                ui.style.right = '20px';
+                                ui.style.zIndex = '10000';
+                            }
+                        }
+                    };
+                })();
+            `;
+            document.head.appendChild(script);
+            
+            // Call the demo function
+            if (window.createUIForDemo) {
+                window.createUIForDemo();
+            }
+        }
+        
+        function getUIHTML() {
+            return \`
+                <div id="chatgpt-automation-ui" class="automation-ui" style="display: none;">
+                    <div class="automation-header">
+                        <div class="header-left">
+                            <span class="header-title">ChatGPT Automator</span>
+                            <span class="version-badge">v1.8</span>
+                        </div>
+                        <div class="header-right">
+                            <button class="header-btn" id="minimize-btn" title="Minimize">−</button>
+                            <button class="header-btn" id="close-btn" title="Close">✕</button>
+                        </div>
+                    </div>
+                    
+                    <div class="automation-form">
+                        <div class="tab-container">
+                            <button class="tab-btn active" data-tab="composer">Composer</button>
+                            <button class="tab-btn" data-tab="settings">Settings</button>
+                        </div>
+
+                        <div class="tab-content active" id="composer-tab">
+                            <div class="form-group">
+                                <label>Composition Canvas:</label>
+                                <div id="chain-canvas" class="chain-canvas">
+                                    <div class="chain-toolbar">
+                                        <button class="btn btn-secondary" id="add-step-btn">Add Step</button>
+                                        <button class="btn btn-secondary" id="validate-chain-btn">Validate Composition</button>
+                                        <button class="btn btn-primary" id="run-chain-btn">Run Composition</button>
+                                    </div>
+                                    <div id="chain-cards" class="chain-cards">
+                                        <div class="empty-chain-container">
+                                            <div class="empty-message">Start building your composition</div>
+                                            <button class="btn btn-primary btn-lg" id="add-first-step-btn">Add First Step</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="help-text">Visual editor for multi-step compositions. Steps connect in sequence; supports templates and JavaScript.</div>
+                            </div>
+                        </div>
+
+                        <div class="tab-content" id="settings-tab">
+                            <div class="form-group">
+                                <label>Debug mode:</label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="debug-mode-checkbox">
+                                    <span class="checkmark"></span>
+                                    Enable debug logging
+                                </label>
+                            </div>
+                            <div class="form-group">
+                                <label>Visibility:</label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="default-visible-checkbox">
+                                    <span class="checkmark"></span>
+                                    Show panel by default
+                                </label>
+                                <div class="help-text">Controls default visibility on page load.</div>
+                            </div>
+                        </div>
+                        
+                        <div class="form-actions">
+                            <button id="send-btn" class="btn btn-primary">
+                                <span class="btn-text">Send Message</span>
+                            </button>
+                            <button id="clear-btn" class="btn btn-secondary">Clear</button>
+                        </div>
+                    </div>
+
+                    <div class="automation-log" id="log-container">
+                        <div class="log-header">
+                            <span>Activity Log</span>
+                            <div class="log-header-controls">
+                                <button class="tool-btn" id="toggle-auto-scroll-btn" title="Toggle Auto-scroll">📜</button>
+                                <button class="tool-btn" id="clear-log-btn" title="Clear Log">🗑️</button>
+                            </div>
+                        </div>
+                        <div class="log-content" id="log-content">
+                            <div class="log-entry info">
+                                <span class="log-timestamp">[Demo]</span>
+                                <span class="log-message">ChatGPT Automator UI loaded successfully</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            \`;
+        }
+    </script>
+</body>
+</html>`

@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChatGPT Automator UI Demo</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f6f6f6;
+        }
+        .demo-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        h1, h2 {
+            color: #333;
+        }
+        .note {
+            background: #e3f2fd;
+            padding: 10px;
+            border-radius: 4px;
+            border-left: 4px solid #2196f3;
+            margin: 10px 0;
+        }
+        .launch-btn {
+            background: #6366f1;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            margin: 10px 0;
+        }
+        .launch-btn:hover {
+            background: #5855eb;
+        }
+        
+        /* Demo UI Styles - simplified version */
+        #demo-ui {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 380px;
+            background: white;
+            border: 1px solid rgba(0,0,0,0.1);
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+            font-family: inherit;
+            z-index: 10000;
+            overflow: hidden;
+        }
+        
+        .demo-header {
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            color: white;
+            padding: 12px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .demo-header-title {
+            font-weight: 600;
+            font-size: 14px;
+        }
+        
+        .version-badge {
+            background: rgba(255,255,255,0.2);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 11px;
+            margin-left: 8px;
+        }
+        
+        .demo-close {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 18px;
+            cursor: pointer;
+            padding: 4px;
+        }
+        
+        .demo-tabs {
+            display: flex;
+            border-bottom: 1px solid rgba(0,0,0,0.06);
+        }
+        
+        .demo-tab {
+            background: none;
+            border: none;
+            padding: 12px 20px;
+            cursor: pointer;
+            color: #6b7280;
+            font-size: 13px;
+            font-weight: 500;
+            border-bottom: 2px solid transparent;
+        }
+        
+        .demo-tab.active {
+            color: #6366f1;
+            border-color: #6366f1;
+        }
+        
+        .demo-content {
+            padding: 16px;
+        }
+        
+        .demo-canvas {
+            background: #f8fafc;
+            border: 1px solid rgba(0,0,0,0.06);
+            border-radius: 8px;
+            padding: 16px;
+            margin: 8px 0;
+        }
+        
+        .demo-toolbar {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        
+        .demo-btn {
+            background: #f3f4f6;
+            border: 1px solid rgba(0,0,0,0.1);
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+        
+        .demo-btn-primary {
+            background: #6366f1;
+            color: white;
+            border-color: #6366f1;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            border: 2px dashed rgba(0,0,0,0.2);
+            border-radius: 12px;
+            background: rgba(0,0,0,0.02);
+            color: #6b7280;
+        }
+        
+        .empty-message {
+            font-size: 14px;
+            margin-bottom: 16px;
+            font-weight: 500;
+        }
+        
+        .add-first-btn {
+            background: #6366f1;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        
+        .help-text {
+            font-size: 12px;
+            color: #6b7280;
+            margin-top: 8px;
+        }
+        
+        .step-card {
+            background: #f8fafc;
+            border: 1px solid rgba(0,0,0,0.06);
+            border-radius: 8px;
+            padding: 12px;
+            margin: 8px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .step-info {
+            flex: 1;
+        }
+        
+        .step-title {
+            font-weight: 600;
+            font-size: 13px;
+            margin-bottom: 4px;
+        }
+        
+        .step-meta {
+            font-size: 11px;
+            color: #6b7280;
+        }
+        
+        .step-actions {
+            display: flex;
+            gap: 6px;
+        }
+        
+        .step-btn {
+            background: #f3f4f6;
+            border: 1px solid rgba(0,0,0,0.1);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            cursor: pointer;
+        }
+        
+        .step-btn-danger {
+            background: #fee2e2;
+            border-color: #fecaca;
+            color: #dc2626;
+        }
+    </style>
+</head>
+<body>
+    <h1>ChatGPT Automator UI Demo</h1>
+    
+    <div class="demo-container">
+        <h2>New UI Structure - v1.8</h2>
+        <p>This demo shows the restructured ChatGPT Automator interface with the new simplified navigation.</p>
+        <div class="note">
+            <strong>Key Changes Implemented:</strong><br>
+            • Main tabs simplified to just "Composer" and "Settings"<br>
+            • Templates, Simple, and Response (JS) moved to step editor popup<br>
+            • Empty state with attractive "Add First Step" button<br>
+            • Delete buttons on each step card with confirmation<br>
+            • Preset dropdowns in both main interface and popup<br>
+            • Auto-population of next steps for improved workflow<br>
+            • Enhanced error handling with null checks
+        </div>
+        
+        <button class="launch-btn" onclick="showDemo()">Show New Interface</button>
+        <button class="launch-btn" onclick="hideDemo()" style="background: #6b7280;">Hide Interface</button>
+    </div>
+
+    <!-- Demo UI -->
+    <div id="demo-ui" style="display: none;">
+        <div class="demo-header">
+            <div>
+                <span class="demo-header-title">ChatGPT Automator</span>
+                <span class="version-badge">v1.8</span>
+            </div>
+            <button class="demo-close" onclick="hideDemo()">✕</button>
+        </div>
+        
+        <div class="demo-tabs">
+            <button class="demo-tab active" onclick="switchTab('composer')">Composer</button>
+            <button class="demo-tab" onclick="switchTab('settings')">Settings</button>
+        </div>
+        
+        <div class="demo-content">
+            <div id="composer-tab" class="tab-pane">
+                <label style="font-weight: 500; display: block; margin-bottom: 8px;">Composition Canvas:</label>
+                <div class="demo-canvas">
+                    <div class="demo-toolbar">
+                        <button class="demo-btn" onclick="addStep()">Add Step</button>
+                        <button class="demo-btn">Validate Composition</button>
+                        <button class="demo-btn demo-btn-primary">Run Composition</button>
+                    </div>
+                    <div id="chain-cards">
+                        <div class="empty-state">
+                            <div class="empty-message">Start building your composition</div>
+                            <button class="add-first-btn" onclick="addStep()">Add First Step</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="help-text">Visual editor for multi-step compositions. Steps connect in sequence; supports templates and JavaScript.</div>
+            </div>
+            
+            <div id="settings-tab" class="tab-pane" style="display: none;">
+                <div style="margin-bottom: 16px;">
+                    <label style="font-weight: 500; display: block; margin-bottom: 8px;">Debug mode:</label>
+                    <label style="display: flex; align-items: center; font-size: 14px;">
+                        <input type="checkbox" style="margin-right: 8px;">
+                        Enable debug logging
+                    </label>
+                </div>
+                <div style="margin-bottom: 16px;">
+                    <label style="font-weight: 500; display: block; margin-bottom: 8px;">Visibility:</label>
+                    <label style="display: flex; align-items: center; font-size: 14px;">
+                        <input type="checkbox" style="margin-right: 8px;">
+                        Show panel by default
+                    </label>
+                    <div class="help-text">Controls default visibility on page load. You can still toggle from the header button.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let stepCount = 0;
+        
+        function showDemo() {
+            document.getElementById('demo-ui').style.display = 'block';
+        }
+        
+        function hideDemo() {
+            document.getElementById('demo-ui').style.display = 'none';
+        }
+        
+        function switchTab(tabName) {
+            // Update tab buttons
+            document.querySelectorAll('.demo-tab').forEach(tab => tab.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            // Update tab content
+            document.querySelectorAll('.tab-pane').forEach(pane => pane.style.display = 'none');
+            document.getElementById(tabName + '-tab').style.display = 'block';
+        }
+        
+        function addStep() {
+            stepCount++;
+            const cardsContainer = document.getElementById('chain-cards');
+            
+            // Remove empty state if it exists
+            const emptyState = cardsContainer.querySelector('.empty-state');
+            if (emptyState) {
+                emptyState.remove();
+            }
+            
+            // Add new step card
+            const stepCard = document.createElement('div');
+            stepCard.className = 'step-card';
+            stepCard.innerHTML = `
+                <div class="step-info">
+                    <div class="step-title">Step ${stepCount}</div>
+                    <div class="step-meta">type: simple${stepCount > 1 ? ' → step-' + (stepCount + 1) : ''}</div>
+                </div>
+                <div class="step-actions">
+                    <button class="step-btn" onclick="editStep(this)">Edit</button>
+                    <button class="step-btn step-btn-danger" onclick="deleteStep(this)">Delete</button>
+                </div>
+            `;
+            cardsContainer.appendChild(stepCard);
+        }
+        
+        function editStep(btn) {
+            alert('Step editor modal would open here with the new interface:\n\n• Simple message input\n• Template input\n• Response (JS) code editor\n• HTTP request configuration\n• Preset dropdowns for quick loading');
+        }
+        
+        function deleteStep(btn) {
+            if (confirm('Delete this step?')) {
+                const card = btn.closest('.step-card');
+                card.remove();
+                
+                // Show empty state if no more steps
+                const cardsContainer = document.getElementById('chain-cards');
+                if (!cardsContainer.querySelector('.step-card')) {
+                    cardsContainer.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-message">Start building your composition</div>
+                            <button class="add-first-btn" onclick="addStep()">Add First Step</button>
+                        </div>
+                    `;
+                }
+            }
+        }
+    </script>
+</body>
+</html>
