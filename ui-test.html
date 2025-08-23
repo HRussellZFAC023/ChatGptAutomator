@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>ChatGPT Automator UI Test</title>
+    <style>
+        body { margin: 0; padding: 20px; background: #f0f0f0; font-family: system-ui; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .note { background: #fff; padding: 15px; margin-bottom: 20px; border-radius: 8px; border-left: 4px solid #007acc; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="note">
+            <h1>ChatGPT Automator UI Preview</h1>
+            <p>This file tests the UI changes being made to streamline the interface.</p>
+            <p><strong>Changes in progress:</strong></p>
+            <ul>
+                <li>✓ Renamed 'Chain' to 'Composer' and removed old tabs</li>
+                <li>✓ Added preset dropdowns to Composer tab</li>
+                <li>✓ Implemented empty chain state with dotted border</li>
+                <li>✓ Added delete buttons to chain elements</li>
+                <li>✓ Updated modal with new sections (Simple, Template, Response JS)</li>
+                <li>⚠️ Need to test functionality and fix any remaining issues</li>
+            </ul>
+        </div>
+        <script>
+            // Mock GM functions for testing
+            window.GM_setValue = (key, value) => {
+                console.log('GM_setValue:', key, value);
+                localStorage.setItem(key, JSON.stringify(value));
+            };
+            window.GM_getValue = (key, defaultValue) => {
+                const stored = localStorage.getItem(key);
+                console.log('GM_getValue:', key, stored ? JSON.parse(stored) : defaultValue);
+                return stored ? JSON.parse(stored) : defaultValue;
+            };
+            window.GM_xmlhttpRequest = () => {
+                console.log('GM_xmlhttpRequest called');
+            };
+            window.unsafeWindow = window;
+            
+            // Mock ChatGPT DOM elements that the script looks for
+            const mockElements = [
+                'main form textarea',
+                '[data-testid="send-button"]'
+            ];
+            
+            mockElements.forEach(selector => {
+                if (!document.querySelector(selector)) {
+                    const el = document.createElement('div');
+                    el.id = selector.replace(/[\[\]="]/g, '');
+                    el.style.display = 'none';
+                    document.body.appendChild(el);
+                }
+            });
+        </script>
+    </div>
+    <script src="chatgptAutomation.js"></script>
+</body>
+</html>

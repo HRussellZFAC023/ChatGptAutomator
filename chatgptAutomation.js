@@ -2,7 +2,7 @@
 // ==UserScript==
 // @name         ChatGPT Automation Pro
 // @namespace    http://tampermonkey.net/
-// @version      1.7
+// @version      1.8
 // @description  Advanced ChatGPT automation with dynamic templating
 // @author       Henry Russell
 // @match        https://chatgpt.com/*
@@ -801,44 +801,13 @@
 
         <div class="automation-form">
                     <div class="tab-container">
-                        <button class="tab-btn active" data-tab="simple">Simple</button>
-                        <button class="tab-btn" data-tab="template">Template</button>
-            <button class="tab-btn" data-tab="chain">Chain</button>
-                        <button class="tab-btn" data-tab="advanced">Response (JS)</button>
+                        <button class="tab-btn active" data-tab="chain">Composer</button>
                         <button class="tab-btn" data-tab="settings">Settings</button>
                     </div>
 
-                    <div class="tab-content active" id="simple-tab">
+                    <div class="tab-content active" id="chain-tab">
                         <div class="form-group">
-                            <label for="message-input">Message:</label>
-                            <textarea id="message-input" placeholder="Enter your message for ChatGPT..." rows="3"></textarea>
-                        </div>
-                    </div>
-
-                    <div class="tab-content" id="template-tab">
-                        <div class="form-group">
-                            <label for="template-input">Message Template:</label>
-                            <textarea id="template-input" placeholder="Template with placeholders like {{item}}, {{index}}, {{total}} or {item.name}..." rows="3"></textarea>
-                            <div class="help-text">Use {{item}} / {item}, {{index}} / {index}, {{total}} / {total}. Nested paths supported, e.g. {item.name} or {{item.orderId}}</div>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="dynamic-elements-input">Dynamic Elements (JSON array or function):</label>
-                            <div class="code-editor">
-                                <textarea id="dynamic-elements-input" placeholder='["item1", "item2", "item3"] or () => ["generated", "items"]' rows="4"></textarea>
-                                <div class="editor-tools">
-                                    <button class="tool-btn" id="format-json-btn" title="Format JSON">{ }</button>
-                                    <button class="tool-btn" id="validate-elements-btn" title="Validate">✓</button>
-                                    <button class="tool-btn" id="elements-syntax-check-btn" title="Check JS">JS</button>
-                                    <button class="tool-btn" id="elements-insert-fn-btn" title="Insert Snippet">📝</button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="tab-content" id="chain-tab">
-                        <div class="form-group">
-                            <label>Chain Canvas:</label>
+                            <label>Composer Canvas:</label>
                             <div id="chain-canvas" class="chain-canvas">
                                 <div class="chain-toolbar">
                                     <button class="btn btn-secondary" id="add-step-btn">Add Step</button>
@@ -847,7 +816,7 @@
                                 </div>
                                 <div id="chain-cards" class="chain-cards"></div>
                             </div>
-                            <div class="help-text">Visual editor for multi-step chains. Steps connect in sequence; supports nested sub-batches.</div>
+                            <div class="help-text">Visual editor for multi-step workflows. Create templates, automation chains, and custom responses.</div>
                         </div>
                         <div class="form-group">
                             <label for="chain-json-input">Chain JSON (advanced):</label>
@@ -857,24 +826,6 @@
                                     <button class="tool-btn" id="format-chain-json-btn" title="Format JSON">{ }</button>
                                 </div>
                             </div>
-                        </div>
-                    </div>
-
-                    <div class="tab-content" id="advanced-tab">
-                        <div class="form-group">
-                            <label for="custom-code-input">Custom Code (JavaScript):</label>
-                            <div class="code-editor">
-                                <textarea id="custom-code-input" placeholder="// Custom code to run after response (optional)
-// Available variables: response, log, console, item, index, total, http
-// http: cross-origin helper (GM_xmlhttpRequest)
-//   await http.postForm('https://api.example.com/submit', { foo: 'bar' })
-// Example: log('Response length: ' + response.length);" rows="6"></textarea>
-                                <div class="editor-tools">
-                                    <button class="tool-btn" id="syntax-check-btn" title="Check Syntax">JS</button>
-                                    <button class="tool-btn" id="insert-template-btn" title="Insert Template">📝</button>
-                                </div>
-                            </div>
-                            <div class="help-text">Runs your JavaScript after ChatGPT finishes. Use <code>response</code> (string), <code>log()</code>, and <code>http</code> (CORS-capable) to integrate with any website's API.</div>
                         </div>
                     </div>
 
@@ -1670,6 +1621,47 @@
             #chatgpt-automation-ui .chain-card .meta { font-size:11px; opacity:0.8; margin-bottom:6px; }
             #chatgpt-automation-ui .chain-card .actions { display:flex; gap:6px; }
 
+            /* Empty state for chain cards */
+            #chatgpt-automation-ui .chain-empty-state {
+                border: 2px dashed var(--border-light, rgba(0,0,0,0.2));
+                border-radius: 8px;
+                padding: 32px 16px;
+                margin: 8px 0;
+                text-align: center;
+                background: var(--input-background, rgba(0,0,0,0.02));
+                min-height: 120px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+            #chatgpt-automation-ui.dark-mode .chain-empty-state {
+                border-color: var(--border-light, rgba(255,255,255,0.2));
+                background: var(--input-background, rgba(255,255,255,0.02));
+            }
+            #chatgpt-automation-ui .empty-content {
+                max-width: 240px;
+            }
+            #chatgpt-automation-ui .empty-icon {
+                font-size: 28px;
+                margin-bottom: 12px;
+                opacity: 0.6;
+            }
+            #chatgpt-automation-ui .empty-title {
+                font-size: 16px;
+                font-weight: 600;
+                margin-bottom: 8px;
+                color: var(--text-primary, #374151);
+            }
+            #chatgpt-automation-ui.dark-mode .empty-title {
+                color: var(--text-primary, #f9fafb);
+            }
+            #chatgpt-automation-ui .empty-description {
+                font-size: 13px;
+                color: var(--text-secondary, #6b7280);
+                margin-bottom: 16px;
+                line-height: 1.4;
+            }
+
             /* Modal */
             #chatgpt-automation-ui .chain-modal { position: fixed; inset:0; z-index:10001; }
             #chatgpt-automation-ui .chain-modal-backdrop { position:absolute; inset:0; background: rgba(0,0,0,0.3); }
@@ -1774,7 +1766,7 @@
             }
 
             // Active tab
-            const savedTab = GM_getValue(STORAGE_KEYS.activeTab, 'simple');
+            const savedTab = GM_getValue(STORAGE_KEYS.activeTab, 'chain');
             const tabBtn = document.querySelector(`.tab-btn[data-tab="${savedTab}"]`);
             if (tabBtn) tabBtn.click();
 
@@ -2529,7 +2521,33 @@ if (response.includes('error')) {
             chainCards.innerHTML = '';
             let chain;
             try { chain = JSON.parse(chainInput.value || '{}'); } catch { chain = null; }
-            if (!chain || !Array.isArray(chain.steps)) return;
+            if (!chain || !Array.isArray(chain.steps) || chain.steps.length === 0) {
+                // Show empty state with dotted border and prominent add button
+                const emptyState = document.createElement('div');
+                emptyState.className = 'chain-empty-state';
+                emptyState.innerHTML = `
+                    <div class="empty-content">
+                        <div class="empty-icon">📝</div>
+                        <div class="empty-title">Start building your workflow</div>
+                        <div class="empty-description">Create templates, automation chains, and custom responses</div>
+                        <button class="btn btn-primary" id="add-first-step-btn">Add First Step</button>
+                    </div>
+                `;
+                emptyState.querySelector('#add-first-step-btn').addEventListener('click', () => {
+                    let chain;
+                    try { chain = JSON.parse(chainInput.value || '{}'); } catch { chain = {}; }
+                    if (!chain.steps) chain.steps = [];
+                    const id = `step-${(chain.steps.length||0)+1}`;
+                    chain.steps.push({ id, title: `Step ${chain.steps.length+1}`, type: 'prompt', template: '' });
+                    if (!chain.entryId) chain.entryId = id;
+                    chainInput.value = JSON.stringify(chain, null, 2);
+                    saveToStorage(STORAGE_KEYS.chainDef, chainInput.value);
+                    refreshChainCards();
+                    openStepEditor(id);
+                });
+                chainCards.appendChild(emptyState);
+                return;
+            }
             chain.steps.forEach(step => {
                 const card = document.createElement('div');
                 card.className = 'chain-card';
@@ -2539,9 +2557,20 @@ if (response.includes('error')) {
                     <div class="meta">type: ${step.type}${step.next ? ` → ${step.next}` : ''}</div>
                     <div class="actions">
                         <button class="btn btn-secondary btn-sm" data-action="edit">Edit</button>
+                        <button class="btn btn-danger btn-sm" data-action="delete">Delete</button>
                     </div>
                 `;
                 card.querySelector('[data-action="edit"]').addEventListener('click', () => openStepEditor(step.id));
+                card.querySelector('[data-action="delete"]').addEventListener('click', () => {
+                    if (confirm(`Delete step "${step.title || step.id}"?`)) {
+                        chain.steps = chain.steps.filter(s => s.id !== step.id);
+                        // Remove references
+                        chain.steps.forEach(s => { if (s.next === step.id) s.next = ''; });
+                        chainInput.value = JSON.stringify(chain, null, 2);
+                        saveToStorage(STORAGE_KEYS.chainDef, chainInput.value);
+                        refreshChainCards();
+                    }
+                });
                 chainCards.appendChild(card);
             });
         };
