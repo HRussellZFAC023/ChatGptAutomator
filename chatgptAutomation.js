@@ -2,7 +2,7 @@
 // ==UserScript==
 // @name         ChatGPT Automation Pro
 // @namespace    http://tampermonkey.net/
-// @version      1.7
+// @version      1.8
 // @description  Advanced ChatGPT automation with dynamic templating
 // @author       Henry Russell
 // @match        https://chatgpt.com/*
@@ -2082,7 +2082,9 @@
         });
 
     // Send button
-        document.getElementById('send-btn').addEventListener('click', async () => {
+        const sendBtn = document.getElementById('send-btn');
+        if (sendBtn) {
+            sendBtn.addEventListener('click', async () => {
             const activeTab = document.querySelector('.tab-btn.active').dataset.tab;
             const sendBtn = document.getElementById('send-btn');
             const btnText = sendBtn.querySelector('.btn-text');
@@ -2161,105 +2163,136 @@
                 }
             }
         });
+        }
 
     // Stop batch button
-        document.getElementById('stop-batch-btn').addEventListener('click', () => {
-            stopBatchProcessing();
-            document.getElementById('stop-batch-btn').style.display = 'none';
-        });
+        const stopBatchBtn = document.getElementById('stop-batch-btn');
+        if (stopBatchBtn) {
+            stopBatchBtn.addEventListener('click', () => {
+                stopBatchProcessing();
+                stopBatchBtn.style.display = 'none';
+            });
+        }
 
         // Auto-remove processed items checkbox
-        document.getElementById('auto-remove-checkbox').addEventListener('change', (e) => {
+        const autoRemoveCheckbox = document.getElementById('auto-remove-checkbox');
+        if (autoRemoveCheckbox) {
+            autoRemoveCheckbox.addEventListener('change', (e) => {
             autoRemoveProcessed = e.target.checked;
             log(`Auto-remove processed items: ${autoRemoveProcessed ? 'enabled' : 'disabled'}`);
             saveToStorage(STORAGE_KEYS.autoRemove, autoRemoveProcessed);
         });
+        }
 
         // New chat per item checkbox
-        document.getElementById('new-chat-checkbox').addEventListener('change', (e) => {
-            newChatPerItem = e.target.checked;
-            log(`New chat per item: ${newChatPerItem ? 'enabled' : 'disabled'}`);
-            saveToStorage(STORAGE_KEYS.newChat, newChatPerItem);
-        });
+        const newChatCheckbox = document.getElementById('new-chat-checkbox');
+        if (newChatCheckbox) {
+            newChatCheckbox.addEventListener('change', (e) => {
+                newChatPerItem = e.target.checked;
+                log(`New chat per item: ${newChatPerItem ? 'enabled' : 'disabled'}`);
+                saveToStorage(STORAGE_KEYS.newChat, newChatPerItem);
+            });
+        }
 
         // Wait time input
-        document.getElementById('wait-time-input').addEventListener('change', (e) => {
-            const value = parseInt(e.target.value);
-            if (value >= 0 && value <= 30000) {
-                batchWaitTime = value;
-                log(`Wait time between items set to ${value}ms`);
-                saveToStorage(STORAGE_KEYS.waitTime, batchWaitTime);
-            } else {
-                e.target.value = batchWaitTime;
-                log('Invalid wait time, keeping current value', 'warning');
-            }
-        });
+        const waitTimeInput = document.getElementById('wait-time-input');
+        if (waitTimeInput) {
+            waitTimeInput.addEventListener('change', (e) => {
+                const value = parseInt(e.target.value);
+                if (value >= 0 && value <= 30000) {
+                    batchWaitTime = value;
+                    log(`Wait time between items set to ${value}ms`);
+                    saveToStorage(STORAGE_KEYS.waitTime, batchWaitTime);
+                } else {
+                    e.target.value = batchWaitTime;
+                    log('Invalid wait time, keeping current value', 'warning');
+                }
+            });
+        }
 
         // Clear button
-        document.getElementById('clear-btn').addEventListener('click', () => {
-            messageInput.value = '';
-            customCodeInput.value = '';
-            templateInput.value = '';
-            dynamicElementsInput.value = '';
-            document.getElementById('loop-checkbox').checked = false;
-            log('Form cleared');
+        const clearBtn = document.getElementById('clear-btn');
+        if (clearBtn) {
+            clearBtn.addEventListener('click', () => {
+                if (messageInput) messageInput.value = '';
+                if (customCodeInput) customCodeInput.value = '';
+                if (templateInput) templateInput.value = '';
+                if (dynamicElementsInput) dynamicElementsInput.value = '';
+                const loopCheckbox = document.getElementById('loop-checkbox');
+                if (loopCheckbox) loopCheckbox.checked = false;
+                log('Form cleared');
 
-            // Persist cleared state
-            try {
-                GM_setValue(STORAGE_KEYS.messageInput, '');
-                GM_setValue(STORAGE_KEYS.customCodeInput, '');
-                GM_setValue(STORAGE_KEYS.templateInput, '');
-                GM_setValue(STORAGE_KEYS.dynamicElementsInput, '');
-                GM_setValue(STORAGE_KEYS.loop, false);
-            } catch { }
-        });
+                // Persist cleared state
+                try {
+                    GM_setValue(STORAGE_KEYS.messageInput, '');
+                    GM_setValue(STORAGE_KEYS.customCodeInput, '');
+                    GM_setValue(STORAGE_KEYS.templateInput, '');
+                    GM_setValue(STORAGE_KEYS.dynamicElementsInput, '');
+                    GM_setValue(STORAGE_KEYS.loop, false);
+                } catch { }
+            });
+        }
 
         // Toggle log button
-        document.getElementById('toggle-log-btn').addEventListener('click', () => {
-            const logElement = document.getElementById('log-container');
-            // Instead of fully hiding, toggle between compact and expanded heights
-            const compact = logElement.dataset.compact === 'true';
-            logElement.dataset.compact = (!compact).toString();
-            if (compact) {
-                logElement.style.maxHeight = '220px';
-                log('Log expanded');
-            } else {
-                logElement.style.maxHeight = '120px';
-                log('Log compact');
-            }
+        const toggleLogBtn = document.getElementById('toggle-log-btn');
+        if (toggleLogBtn) {
+            toggleLogBtn.addEventListener('click', () => {
+                const logElement = document.getElementById('log-container');
+                if (!logElement) return;
+                // Instead of fully hiding, toggle between compact and expanded heights
+                const compact = logElement.dataset.compact === 'true';
+                logElement.dataset.compact = (!compact).toString();
+                if (compact) {
+                    logElement.style.maxHeight = '220px';
+                    log('Log expanded');
+                } else {
+                    logElement.style.maxHeight = '120px';
+                    log('Log compact');
+                }
 
-            // Auto-resize container after log visibility change
-            setTimeout(() => autoResizeContainer(), 100);
-        });
+                // Auto-resize container after log visibility change
+                setTimeout(() => autoResizeContainer(), 100);
+            });
+        }
 
         // Clear log button
-        document.getElementById('clear-log-btn').addEventListener('click', () => {
-            logContainer.innerHTML = '';
-            log('Log cleared');
-        });
+        const clearLogBtn = document.getElementById('clear-log-btn');
+        if (clearLogBtn) {
+            clearLogBtn.addEventListener('click', () => {
+                if (logContainer) logContainer.innerHTML = '';
+                log('Log cleared');
+            });
+        }
 
         // Toggle auto-scroll button
-        document.getElementById('toggle-auto-scroll-btn').addEventListener('click', () => {
-            autoScrollLogs = !autoScrollLogs;
+        const toggleAutoScrollBtn = document.getElementById('toggle-auto-scroll-btn');
+        if (toggleAutoScrollBtn) {
+            toggleAutoScrollBtn.addEventListener('click', () => {
+                autoScrollLogs = !autoScrollLogs;
 
-            const btn = document.getElementById('toggle-auto-scroll-btn');
-            btn.style.opacity = autoScrollLogs ? '1' : '0.5';
-            btn.title = autoScrollLogs ? 'Auto-scroll: ON' : 'Auto-scroll: OFF';
+                const btn = document.getElementById('toggle-auto-scroll-btn');
+                if (btn) {
+                    btn.style.opacity = autoScrollLogs ? '1' : '0.5';
+                    btn.title = autoScrollLogs ? 'Auto-scroll: ON' : 'Auto-scroll: OFF';
+                }
 
-            log(`Auto-scroll logs: ${autoScrollLogs ? 'enabled' : 'disabled'}`);
+                log(`Auto-scroll logs: ${autoScrollLogs ? 'enabled' : 'disabled'}`);
 
-            // If enabling auto-scroll, scroll to bottom immediately
-            if (autoScrollLogs && logContainer) {
-                logContainer.scrollTop = logContainer.scrollHeight;
-            }
+                // If enabling auto-scroll, scroll to bottom immediately
+                if (autoScrollLogs && logContainer) {
+                    logContainer.scrollTop = logContainer.scrollHeight;
+                }
 
-            // Save state to storage
-            saveToStorage(STORAGE_KEYS.autoScroll, autoScrollLogs);
-        });
+                // Save state to storage
+                saveToStorage(STORAGE_KEYS.autoScroll, autoScrollLogs);
+            });
+        }
 
     // Minimize button: compact the panel's height when minimized and restore on un-minimize
         let _previousHeight = null;
-        document.getElementById('minimize-btn').addEventListener('click', () => {
+        const minimizeBtn = document.getElementById('minimize-btn');
+        if (minimizeBtn) {
+            minimizeBtn.addEventListener('click', () => {
             isMinimized = !isMinimized;
             if (isMinimized) {
                 // Save previous explicit height if present
@@ -2282,16 +2315,22 @@
                 const logCont = document.querySelector('#log-container');
                 if (logCont) logCont.style.maxHeight = '';
             }
-            saveUIState(true); // Immediate save for user action
-        });
+                saveUIState(true); // Immediate save for user action
+            });
+        }
 
         // Close button
-        document.getElementById('close-btn').addEventListener('click', () => {
-            mainContainer.style.display = 'none';
-            uiVisible = false;
-            saveUIState(true); // Immediate save for user action
-            log('UI closed');
-        });
+        const closeBtn = document.getElementById('close-btn');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => {
+                if (mainContainer) {
+                    mainContainer.style.display = 'none';
+                    uiVisible = false;
+                    saveUIState(true); // Immediate save for user action
+                    log('UI closed');
+                }
+            });
+        }
 
         // Tool buttons
         document.getElementById('format-json-btn').addEventListener('click', () => {
@@ -2702,7 +2741,17 @@ if (response.includes('error')) {
             try { chain = JSON.parse(chainInput.value || '{}'); } catch { chain = {}; }
             if (!chain.steps) chain.steps = [];
             const id = `step-${(chain.steps.length||0)+1}`;
-            chain.steps.push({ id, title: `Step ${chain.steps.length+1}`, type: 'prompt', template: '' });
+            const newStep = { id, title: `Step ${chain.steps.length+1}`, type: 'simple', template: '' };
+            
+            // Auto-populate next step reference for the previous step
+            if (chain.steps.length > 0) {
+                const lastStep = chain.steps[chain.steps.length - 1];
+                if (!lastStep.next) {
+                    lastStep.next = id;
+                }
+            }
+            
+            chain.steps.push(newStep);
             if (!chain.entryId) chain.entryId = id;
             chainInput.value = JSON.stringify(chain, null, 2);
             saveToStorage(STORAGE_KEYS.chainDef, chainInput.value);
