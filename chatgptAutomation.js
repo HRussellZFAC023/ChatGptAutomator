@@ -97,16 +97,39 @@
             logEntry.textContent = logMessage;
             logContainer.appendChild(logEntry);
 
+            // Maintain a small spacer at the end for visibility
+            let spacer = logContainer.querySelector('.log-spacer');
+            if (!spacer) {
+                spacer = document.createElement('div');
+                spacer.className = 'log-spacer';
+                spacer.style.height = '10px';
+                spacer.style.flex = '0 0 auto';
+                logContainer.appendChild(spacer);
+            } else {
+                logContainer.appendChild(spacer); // move to bottom
+            }
+
             // Auto-scroll logs if enabled
             if (autoScrollLogs) {
                 logContainer.scrollTop = logContainer.scrollHeight;
             }
 
             // Keep only last 50 log entries
-            while (logContainer.children.length > 50) {
-                logContainer.removeChild(logContainer.firstChild);
+            const maxEntries = 50;
+            const entries = Array.from(logContainer.querySelectorAll('.log-entry'));
+            while (entries.length > maxEntries) {
+                const first = entries.shift();
+                if (first && first.parentNode) first.parentNode.removeChild(first);
             }
         }
+    };
+
+    // Small helper to clip long strings for logging
+    const clip = (s, n = 300) => {
+        try {
+            const str = String(s ?? '');
+            return str.length > n ? str.slice(0, n) + '…' : str;
+        } catch { return ''; }
     };
 
     // Detect dark mode
@@ -542,7 +565,7 @@
     // Main automation function with batch processing
     const processMessage = async (message, customCode = '', isTemplate = false) => {
         if (isProcessing && !isLooping) {
-            log('Already processing a message', 'warning');
+            log('⚠️ Already processing a message', 'warning');
             return;
         }
 
@@ -554,35 +577,41 @@
         updateStatus('processing');
 
         try {
+            // Build a lightweight queue that can react to mid-batch template edits
             let messagesToProcess = [];
-
             if (isTemplate && dynamicElements.length > 0) {
-                // Process template with dynamic elements
                 messagesToProcess = dynamicElements.map((element, index) => ({
-                    message: processDynamicTemplate(message, {
-                        item: element,
-                        index: index + 1,
-                        total: dynamicElements.length
-                    }),
-                    customCode,
                     elementData: element,
-                    index: index + 1
+                    index: index + 1,
+                    customCode
                 }));
-
                 if (CONFIG.DEBUG_MODE) {
-                    log(`Processing ${messagesToProcess.length} elements. First element: ${JSON.stringify(dynamicElements[0])}`);
+                    log(`🧮 Queue initialized with ${messagesToProcess.length} items`);
                 }
             } else {
                 messagesToProcess = [{ message, customCode }];
             }
 
             for (let i = 0; i < messagesToProcess.length; i++) {
-                const { message: processedMessage, customCode: code, elementData, index } = messagesToProcess[i];
+                let processedMessage = message;
+                const { customCode: code, elementData, index } = messagesToProcess[i];
 
                 updateProgress(i + 1, messagesToProcess.length);
 
                 if (isTemplate) {
-                    log(`Processing item ${index}/${messagesToProcess.length}: ${JSON.stringify(elementData)}`);
+                    // Re-read current template so edits mid-batch take effect
+                    const currentTemplate = (templateInput && typeof templateInput.value === 'string') ? templateInput.value.trim() : message;
+                    processedMessage = processDynamicTemplate(currentTemplate || message, {
+                        item: elementData,
+                        index: index,
+                        total: messagesToProcess.length
+                    });
+                    log(`📦 Item ${index}/${messagesToProcess.length}`);
+                    // Prompt preview
+                    log(`📝 Prompt ${index}/${messagesToProcess.length}: ${clip(processedMessage, 300)}`);
+                } else {
+                    processedMessage = messagesToProcess[i].message;
+                    log(`📝 Prompt: ${clip(processedMessage, 300)}`);
                 }
 
                 let success = false;
@@ -592,20 +621,19 @@
                 while (!success && retryCount <= maxRetries) {
                     try {
                         if (retryCount > 0) {
-                            log(`Retry attempt ${retryCount} for item ${index}...`);
+                            log(`🔁 Retry attempt ${retryCount}/${maxRetries}${isTemplate ? ` for item ${index}` : ''}`);
                             await sleep(batchWaitTime); // Wait before retry
                         }
 
                         // Start new chat if option is enabled and not the first item
                         if (newChatPerItem && (i > 0 || retryCount > 0)) {
+                            log('🆕 Starting new chat for next item…');
                             const chatSuccess = await startNewChat();
                             if (!chatSuccess) {
-                                log('Failed to start new chat, continuing in current chat', 'warning');
+                                log('⚠️ Failed to start new chat, continuing in current chat', 'warning');
                             }
                             await sleep(1000); // Additional wait after new chat
                         }
-
-                        log(`Starting message processing...`);
 
                         // Type the message
                         await typeMessage(processedMessage);
@@ -616,19 +644,18 @@
                         updateStatus('waiting');
 
                         // Wait for response
-                        log('Waiting for ChatGPT response...');
+                        log('⏳ Waiting for ChatGPT response…');
                         const responseElement = await waitForResponse();
                         const responseText = extractResponseText(responseElement);
-
-                        log('Response received');
-                        console.log('ChatGPT Response:', responseText);
+                        log(`📩 Response received (${responseText.length} chars)`);
+                        log(`📄 ${clip(responseText, 500)}`);
 
                         // Execute custom code if provided
                         if (code && code.trim() !== '') {
-                            if (isTemplate) {
-                                try { log(`Custom code context -> index: ${index ?? 'null'}/${messagesToProcess.length}, item: ${elementData ? JSON.stringify(elementData).slice(0, 200) : 'null'}`); } catch { /* no-op */ }
+                            if (CONFIG.DEBUG_MODE && isTemplate) {
+                                try { log(`🧪 Custom code context i=${index}/${messagesToProcess.length}`); } catch {}
                             }
-                            log('Executing custom code...');
+                            log('⚙️ Executing custom code…');
                             await executeCustomCode(code, responseText, {
                                 elementData,
                                 index,
@@ -645,22 +672,23 @@
                             }
                         }
 
-                        log(`Item ${index} processed successfully`);
+                        log(`${isTemplate ? `✅ Item ${index}` : '✅ Message'} processed successfully`);
                         success = true;
 
                     } catch (itemError) {
                         retryCount++;
-                        log(`Error processing item ${index} (attempt ${retryCount}): ${itemError.message}`, 'error');
+                        const at = isTemplate ? `item ${index} ` : '';
+                        log(`❌ Error processing ${at}(attempt ${retryCount}): ${itemError.message}`, 'error');
 
                         if (retryCount > maxRetries) {
-                            log(`Item ${index} failed after ${maxRetries} retries, skipping...`, 'error');
+                            if (isTemplate) log(`⏭️ Item ${index} failed after ${maxRetries} retries, skipping…`, 'error');
                         }
                     }
                 }
 
                 // Add delay between batch items (user configurable)
                 if (i < messagesToProcess.length - 1) {
-                    log(`Waiting ${batchWaitTime}ms before next item...`);
+                    log(`⏱️ Waiting ${batchWaitTime}ms before next item…`);
                     await sleep(batchWaitTime);
                 }
 
@@ -669,11 +697,11 @@
             }
 
             updateStatus('complete');
-            log('Message processing completed');
+            log('🏁 Batch processing completed');
             updateProgress(0, 0); // Reset progress
 
         } catch (error) {
-            log(`Batch error: ${error.message}`, 'error');
+            log(`💥 Batch error: ${error.message}`, 'error');
             updateStatus('error');
             updateProgress(0, 0);
         } finally {
@@ -958,6 +986,10 @@
                 flex-direction: column;
                 height: 100%;
             }
+            #chatgpt-automation-ui.minimized #log-container {
+                max-height: 48px;
+                overflow: hidden;
+            }
             #chatgpt-automation-ui.minimized .log-content {
                 /* Let logs fill available space and scroll internally */
                 flex: 1 1 auto;
@@ -1029,6 +1061,8 @@
             
             #chatgpt-automation-ui .automation-content {
                 max-height: calc(100% - 60px);
+                overflow-y: auto; /* Allow internal scrolling when panel is not minimized */
+                -webkit-overflow-scrolling: touch;
             }
             
             #chatgpt-automation-ui .progress-container {
@@ -1413,7 +1447,7 @@
             }
             
             #chatgpt-automation-ui .log-header {
-                padding: 10px 16px;
+                padding: 12px 16px;
                 background: var(--surface-secondary, #f8fafc);
                 font-weight: 500;
                 font-size: 13px;
@@ -1434,13 +1468,13 @@
             }
             
             #chatgpt-automation-ui .log-content {
-                padding: 12px;
+                padding: 16px 16px 36px; /* extra bottom padding so last line stays visible */
                 overflow-y: auto;
                 scroll-behavior: smooth;
             }
             
             #chatgpt-automation-ui .log-entry {
-                padding: 4px 0;
+                padding: 6px 0;
                 font-size: 11px;
                 font-family: 'SF Mono', 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
                 border-bottom: 1px solid var(--border-light, rgba(0,0,0,0.03));
@@ -1449,6 +1483,7 @@
             
             #chatgpt-automation-ui .log-entry:last-child {
                 border-bottom: none;
+                margin-bottom: 6px; /* extra space below last entry */
             }
             
             #chatgpt-automation-ui .log-info {
@@ -1988,15 +2023,30 @@
             saveToStorage(STORAGE_KEYS.autoScroll, autoScrollLogs);
         });
 
-        // Minimize button
+        // Minimize button: compact the panel's height when minimized and restore on un-minimize
+        let _previousHeight = null;
         document.getElementById('minimize-btn').addEventListener('click', () => {
             isMinimized = !isMinimized;
             if (isMinimized) {
+                // Save previous explicit height if present
+                _previousHeight = mainContainer.style.height || null;
                 mainContainer.classList.add('minimized');
+                // Set a compact height so logs become smaller
+                mainContainer.style.height = '120px';
+                // Ensure log area remains usable but small
+                const logCont = document.querySelector('#log-container');
+                if (logCont) logCont.style.maxHeight = '48px';
             } else {
                 mainContainer.classList.remove('minimized');
-                // Auto-resize when restoring from minimized state
-                setTimeout(() => autoResizeContainer(), 100);
+                // Restore previous height or auto-resize
+                if (_previousHeight) {
+                    mainContainer.style.height = _previousHeight;
+                } else {
+                    mainContainer.style.height = '';
+                    setTimeout(() => autoResizeContainer(), 100);
+                }
+                const logCont = document.querySelector('#log-container');
+                if (logCont) logCont.style.maxHeight = '';
             }
             saveUIState(true); // Immediate save for user action
         });
