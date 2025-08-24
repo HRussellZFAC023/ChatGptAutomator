@@ -1,3 +1,4 @@
+
 // ==UserScript==
 // @name         ChatGPT Automation Pro
 // @namespace    http://tampermonkey.net/
@@ -106,7 +107,7 @@
             console.log(logMessage);
         }
 
-        if (logContainer) {
+    if (logContainer) {
             const logEntry = document.createElement('div');
             logEntry.className = `log-entry log-${type}`;
             logEntry.textContent = logMessage;
@@ -769,6 +770,34 @@
                                 Show panel by default
                             </label>
                             <div class="help-text">Controls default visibility on page load. You can still toggle from the header button.</div>
+                        </div>
+                        <div class="form-group">
+                            <label>Presets:</label>
+                            <div class="presets-grid">
+                                <div class="preset-block">
+                                    <div class="preset-row">
+                                        <input type="text" id="preset-name-input" class="settings-input" placeholder="Preset name">
+                                    </div>
+                                    <div class="preset-row">
+                                        <button class="btn btn-secondary" id="save-template-preset-btn">Save Template</button>
+                                        <select id="load-template-select" class="settings-input"></select>
+                                        <button class="btn btn-primary" id="load-template-preset-btn">Load</button>
+                                        <button class="btn btn-danger" id="delete-template-preset-btn">Delete</button>
+                                    </div>
+                                    <div class="preset-row">
+                                        <button class="btn btn-secondary" id="save-chain-preset-btn">Save Chain</button>
+                                        <select id="load-chain-select" class="settings-input"></select>
+                                        <button class="btn btn-primary" id="load-chain-preset-btn">Load</button>
+                                        <button class="btn btn-danger" id="delete-chain-preset-btn">Delete</button>
+                                    </div>
+                                    <div class="preset-row">
+                                        <button class="btn btn-secondary" id="save-js-preset-btn">Save Response JS</button>
+                                        <select id="load-js-select" class="settings-input"></select>
+                                        <button class="btn btn-primary" id="load-js-preset-btn">Load</button>
+                                        <button class="btn btn-danger" id="delete-js-preset-btn">Delete</button>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -1612,11 +1641,11 @@
 
         // Get UI elements
         statusIndicator = document.getElementById('status-indicator');
-        logContainer = document.querySelector('.log-content');
+    logContainer = document.querySelector('.log-content');
         progressBar = document.getElementById('progress-container');
         resizeHandle = document.getElementById('resize-handle');
 
-        // Restore saved inputs, toggles and config
+    // Restore saved inputs, toggles and config
         try {
             // Chain JSON
             const savedChain = GM_getValue(STORAGE_KEYS.chainDef, '');
@@ -1755,6 +1784,20 @@
             }
         } catch { }
 
+        // Restore persisted log history
+        try {
+            const hist = GM_getValue(STORAGE_KEYS.logHistory, []);
+            if (Array.isArray(hist) && hist.length && logContainer) {
+                hist.slice(-200).forEach(h => {
+                    const div = document.createElement('div');
+                    div.className = `log-entry log-${h.type||'info'}`;
+                    div.textContent = h.msg;
+                    logContainer.appendChild(div);
+                });
+                logContainer.scrollTop = logContainer.scrollHeight;
+            }
+        } catch {}
+
         // Bind events
         bindEvents();
 
@@ -1790,7 +1833,7 @@
         startHeaderObserver();
         log('UI initialized successfully');
 
-        // Auto-resize container to fit initial content
+    // Auto-resize container to fit initial content
         setTimeout(() => autoResizeContainer(), 200);
     };
 
@@ -1937,7 +1980,7 @@
     };
 
     const bindEvents = () => {
-        // Tab switching
+    // Tab switching
         document.querySelectorAll('.tab-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 const tabName = btn.dataset.tab;
@@ -2286,7 +2329,6 @@
             const modal = document.getElementById('chain-step-modal');
             modal.style.display = 'block';
             modal.setAttribute('aria-hidden', 'false');
-
             // Populate fields
             document.getElementById('step-id-input').value = step.id || '';
             document.getElementById('step-title-input').value = step.title || '';
