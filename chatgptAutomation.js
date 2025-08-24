@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ChatGPT Automation Pro
 // @namespace    http://tampermonkey.net/
-// @version      2.0
+// @version      2.1
 // @description  Advanced ChatGPT automation with dynamic templating
 // @author       Henry Russell
 // @match        https://chatgpt.com/*
@@ -24,10 +24,6 @@
     const CONFIG = {
         DEBUG_MODE: false,
         RESPONSE_TIMEOUT: 3000000, // 5 minutes
-        MIN_WIDTH: 300,
-        MIN_HEIGHT: 200,
-        MAX_WIDTH: 1000,
-        MAX_HEIGHT: 1200,
         DEFAULT_VISIBLE: false,
         RUN_LOCK_TTL_MS: 15000,
         RUN_LOCK_RENEW_MS: 5000,
@@ -83,10 +79,6 @@
         // Config keys
         configDebug: 'config.debugMode',
         configTimeout: 'config.responseTimeout',
-        configMinWidth: 'config.minWidth',
-        configMinHeight: 'config.minHeight',
-        configMaxWidth: 'config.maxWidth',
-        configMaxHeight: 'config.maxHeight',
         configDefaultVisible: 'config.defaultVisible'
     };
 
@@ -111,18 +103,6 @@
             logEntry.className = `log-entry log-${type}`;
             logEntry.textContent = logMessage;
             logContainer.appendChild(logEntry);
-
-            // Maintain a small spacer at the end for visibility
-            let spacer = logContainer.querySelector('.log-spacer');
-            if (!spacer) {
-                spacer = document.createElement('div');
-                spacer.className = 'log-spacer';
-                spacer.style.height = '10px';
-                spacer.style.flex = '0 0 auto';
-                logContainer.appendChild(spacer);
-            } else {
-                logContainer.appendChild(spacer); // move to bottom
-            }
 
             // Auto-scroll logs if enabled
             if (autoScrollLogs) {
@@ -331,7 +311,7 @@
 
     // Storage helper to reduce repetitive try-catch blocks
     const saveToStorage = (key, value) => {
-        try { GM_setValue(key, value); } catch { }
+        try { GM_setValue(key, value); } catch (e) { /* ignore storage errors */ }
     };
 
     // Save UI state (simplified with debouncing)
@@ -344,8 +324,6 @@
                 left: mainContainer.style.left,
                 top: mainContainer.style.top,
                 right: mainContainer.style.right,
-                width: mainContainer.style.width,
-                height: mainContainer.style.height,
                 minimized: isMinimized,
                 visible: uiVisible
             };
@@ -374,61 +352,6 @@
 
 
     const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
-    // Function to start a new chat
-    const startNewChat = async () => {
-        try {
-            log('Starting new chat...');
-
-            // Method 1: Try the "New chat" button (language independent, uses data-testid)
-            const newChatButton = document.querySelector('a[data-testid="create-new-chat-button"]');
-            if (newChatButton) {
-                log('Using new chat button...');
-                newChatButton.click();
-                await sleep(1000);
-                return true;
-            }
-
-            const homeLink = document.querySelector('a[href="/"]');
-            if (homeLink && homeLink.textContent.trim() !== '') {
-                log('Using home link...');
-                homeLink.click();
-                await sleep(1000);
-                return true;
-            }
-
-            log('Using programmatic navigation...');
-            const currentUrl = window.location.href;
-            const baseUrl = window.location.origin;
-
-            // Only navigate if we're not already on the home page
-            if (currentUrl !== baseUrl && currentUrl !== baseUrl + '/') {
-                // Use history.pushState to avoid full page reload
-                window.history.pushState({}, '', '/');
-
-                // Trigger a popstate event to simulate navigation
-                window.dispatchEvent(new PopStateEvent('popstate'));
-                await sleep(1500);
-                return true;
-            }
-
-            log('Already on home page or all methods failed', 'warning');
-            return false;
-
-        } catch (error) {
-            log(`Error starting new chat: ${error.message}`, 'error');
-            return false;
-        }
-    };
-
-    // Function to update dynamic elements in real-time
-    const updateDynamicElementsDisplay = (remainingElements) => {
-        // UI dynamic elements textbox has been removed; keep storage sync for compatibility
-        try {
-            const newValue = JSON.stringify(remainingElements, null, 2);
-            GM_setValue(STORAGE_KEYS.dynamicElementsInput, newValue);
-        } catch { /* noop */ }
-    };
 
     // ChatGPT interaction functions
     const getChatInput = () => {
@@ -607,265 +530,249 @@
         mainContainer.id = 'chatgpt-automation-ui';
         mainContainer.className = isDarkMode ? 'dark-mode' : 'light-mode';
         mainContainer.innerHTML = `
-            <div class="automation-header" id="automation-header">
-                <h3>ChatGPT Automation Pro</h3>
-                <div class="header-controls">
-                    <div class="status-indicator" id="status-indicator">
-                        <span class="status-dot"></span>
-                        <span class="status-text">Ready</span>
-                    </div>
-                    <button class="header-btn" id="header-log-toggle" title="Show/Hide Log" aria-label="Show/Hide Log">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M4 5h16v2H4V5zm0 6h16v2H4v-2zm0 6h10v2H4v-2z"/>
-                        </svg>
-                    </button>
-                    <button class="header-btn" id="minimize-btn" title="Minimize" aria-label="Minimize">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M6 12h12v2H6z"/>
-                        </svg>
-                    </button>
-                    <button class="header-btn" id="close-btn" title="Close" aria-label="Close">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M18.3 5.71L12 12.01L5.7 5.71L4.29 7.12L10.59 13.42L4.29 19.72L5.7 21.13L12 14.83L18.3 21.13L19.71 19.72L13.41 13.42L19.71 7.12L18.3 5.71Z"/>
-                        </svg>
-                    </button>
-                </div>
-            </div>
-
-            <div class="automation-content" id="automation-content">
-                <div class="progress-container" id="progress-container" style="display: none;">
-                    <div class="progress-bar">
-                        <div class="progress-fill"></div>
-                    </div>
-                    <div class="progress-text">0/0</div>
-                </div>
-
-        <div class="automation-form">
-                    <div class="tab-container">
-                        <button class="tab-btn active" data-tab="composer">Composer</button>
-                        <button class="tab-btn" data-tab="settings">Settings</button>
-                    </div>
-
-                    <div class="tab-content active" id="composer-tab">
-                        <div class="form-group">
-                            <label>Composer Canvas:</label>
-                            <div class="composer-presets">
-                                <div class="preset-row">
-                                    <input type="text" id="composer-preset-name-input" class="settings-input" placeholder="Preset name" style="flex: 1;">
-                                    <select id="composer-preset-select" class="settings-input" style="flex: 2;">
-                                        <option value="">Select preset...</option>
-                                    </select>
-                                    <button class="btn btn-secondary" id="save-composer-preset-btn" title="Save current configuration">💾</button>
-                                    <button class="btn btn-primary" id="load-composer-preset-btn" title="Load selected preset">📂</button>
-                                    <button class="btn btn-danger" id="delete-composer-preset-btn" title="Delete selected preset">🗑️</button>
-                                </div>
-                            </div>
-                            <div id="chain-canvas" class="chain-canvas">
-                                <div class="chain-toolbar">
-                                    <button class="btn btn-secondary" id="add-step-btn">Add Step</button>
-                                    <button class="btn btn-secondary" id="validate-chain-btn">Validate Chain</button>
-                                    <button class="btn btn-primary" id="run-chain-btn">Run Chain</button>
-                                </div>
-                                <div id="chain-cards" class="chain-cards"></div>
-                            </div>
-                            <div class="help-text">Visual editor for multi-step automation chains. Steps connect in sequence; supports templates and custom JavaScript execution.</div>
+                <div class="automation-header" id="automation-header">
+                    <h3>ChatGPT Automation Pro</h3>
+                    <div class="header-controls">
+                        <div class="status-indicator" id="status-indicator">
+                            <span class="status-dot"></span>
+                            <span class="status-text">Ready</span>
                         </div>
-                        <div class="form-group">
-                            <label for="chain-json-input">Chain JSON (advanced):</label>
-                            <div class="code-editor">
-                                <textarea id="chain-json-input" rows="6" placeholder='{
-  "entryId": "step-1",
-  "steps": [
-    {
-      "id": "step-1",
-      "type": "prompt",
-      "title": "Create message",
-      "template": "Hello {item}",
-      "next": "step-2"
-    },
-    {
-      "id": "step-2",
-      "type": "js",
-      "title": "Process response",
-      "code": "log(\"Processing: \" + steps[\"step-1\"].response);"
-    }
-  ]
-}'></textarea>
-                                <div class="editor-tools">
-                                    <button class="tool-btn" id="format-chain-json-btn" title="Format JSON">{ }</button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="tab-content" id="settings-tab">
-                        <div class="form-group">
-                            <label>Debug mode:</label>
-                            <label class="checkbox-label">
-                                <input type="checkbox" id="debug-mode-checkbox">
-                                <span class="checkmark"></span>
-                                Enable debug logging
-                            </label>
-                        </div>
-                        <div class="form-group">
-                            <label>Batch settings:</label>
-                            <div class="batch-controls">
-                                <div class="batch-settings">
-                                    <label class="checkbox-label">
-                                        <input type="checkbox" id="loop-checkbox">
-                                        <span class="checkmark"></span>
-                                        Process all items in batch
-                                    </label>
-                                    <label class="checkbox-label">
-                                        <input type="checkbox" id="auto-remove-checkbox" checked>
-                                        <span class="checkmark"></span>
-                                        Remove processed items from queue
-                                    </label>
-                                    <label class="checkbox-label">
-                                        <input type="checkbox" id="new-chat-checkbox">
-                                        <span class="checkmark"></span>
-                                        Start new chat for each item
-                                    </label>
-                                    <div class="wait-time-control">
-                                        <label for="wait-time-input">Wait between items (ms):</label>
-                                        <input type="number" id="wait-time-input" min="100" max="30000" value="2000" step="100">
-                                    </div>
-                                </div>
-                                <div class="batch-actions">
-                                    <button id="stop-batch-btn" class="btn btn-danger" style="display: none;">Stop Batch</button>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label for="response-timeout-input">Response timeout (ms):</label>
-                            <input type="number" id="response-timeout-input" min="10000" max="6000000" step="1000" class="settings-input timeout">
-                        </div>
-                        <div class="form-group">
-                            <label>Panel size limits (px):</label>
-                            <div class="size-inputs-grid">
-                                <div class="size-input-group">
-                                    <label for="min-width-input">Min width</label>
-                                    <input type="number" id="min-width-input" min="200" max="1200" step="10" class="settings-input size">
-                                </div>
-                                <div class="size-input-group">
-                                    <label for="min-height-input">Min height</label>
-                                    <input type="number" id="min-height-input" min="120" max="1200" step="10" class="settings-input size">
-                                </div>
-                                <div class="size-input-group">
-                                    <label for="max-width-input">Max width</label>
-                                    <input type="number" id="max-width-input" min="200" max="2000" step="10" class="settings-input size">
-                                </div>
-                                <div class="size-input-group">
-                                    <label for="max-height-input">Max height</label>
-                                    <input type="number" id="max-height-input" min="120" max="2000" step="10" class="settings-input size">
-                                </div>
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label>Visibility:</label>
-                            <label class="checkbox-label">
-                                <input type="checkbox" id="default-visible-checkbox">
-                                <span class="checkmark"></span>
-                                Show panel by default
-                            </label>
-                            <div class="help-text">Controls default visibility on page load. You can still toggle from the header button.</div>
-                        </div>
-                    </div>
-
-                </div>
-
-                <div class="automation-log" id="log-container">
-                    <div class="log-header">
-                        <span>Activity Log</span>
-                        <div class="log-header-controls">
-                            <button class="tool-btn" id="toggle-auto-scroll-btn" title="Toggle Auto-scroll">📜</button>
-                            <button class="tool-btn" id="clear-log-btn" title="Clear Log">🗑️</button>
-                        </div>
-                    </div>
-                    <div class="log-content"></div>
-                </div>
-            </div>
-
-            <div class="resize-handle" id="resize-handle"></div>
-
-            <!-- Modal for editing a chain step -->
-            <div id="chain-step-modal" class="chain-modal" aria-hidden="true" style="display:none;">
-                <div class="chain-modal-backdrop"></div>
-                <div class="chain-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="chain-step-title">
-                    <div class="chain-modal-header">
-                        <h4 id="chain-step-title">Edit Step</h4>
-                        <div class="step-modal-presets">
-                            <select id="step-preset-select" class="settings-input" style="min-width: 120px;">
-                                <option value="">Select preset...</option>
-                            </select>
-                            <button class="tool-btn" id="save-step-preset-btn" title="Save as preset">💾</button>
-                            <button class="tool-btn" id="delete-step-preset-btn" title="Delete preset">🗑️</button>
-                        </div>
-                        <button class="header-btn" id="close-step-modal-btn" aria-label="Close">
+                        <button class="header-btn" id="header-log-toggle" title="Show/Hide Log" aria-label="Show/Hide Log">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M18.3 5.71L12 12.01L5.7 5.71L4.29 7.12L10.59 13.42L4.29 19.72L5.7 21.13L12 14.83L18.3 21.13L19.71 19.72L13.41 13.42L19.71 7.12L18.3 5.71Z"/>
-                        </svg>
+                                <path d="M4 5h16v2H4V5zm0 6h16v2H4v-2zm0 6h10v2H4v-2z"/>
+                            </svg>
+                        </button>
+                        <button class="header-btn" id="minimize-btn" title="Minimize" aria-label="Minimize">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M6 12h12v2H6z"/>
+                            </svg>
+                        </button>
+                        <button class="header-btn" id="close-btn" title="Close" aria-label="Close">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M18.3 5.71L12 12.01L5.7 5.71L4.29 7.12L10.59 13.42L4.29 19.72L5.7 21.13L12 14.83L18.3 21.13L19.71 19.72L13.41 13.42L19.71 7.12L18.3 5.71Z"/>
+                            </svg>
                         </button>
                     </div>
-                    <div class="chain-modal-body">
-                        <div class="form-group">
-                            <label for="step-id-input">ID</label>
-                            <input id="step-id-input" class="settings-input" placeholder="step-1">
+                </div>
+
+                <div class="automation-content" id="automation-content">
+                    <div class="progress-container" id="progress-container" style="display: none;">
+                        <div class="progress-bar">
+                            <div class="progress-fill"></div>
                         </div>
-                        <div class="form-group">
-                            <label for="step-title-input">Title</label>
-                            <input id="step-title-input" class="settings-input" placeholder="Describe the step">
-                        </div>
-                        <div class="form-group">
-                            <label for="step-type-select">Type</label>
-                            <select id="step-type-select" class="settings-input">
-                                <option value="prompt">Prompt</option>
-                                <option value="template">Template (Batch)</option>
-                                <option value="js">JavaScript</option>
-                                <option value="http">HTTP Request</option>
-                            </select>
-                        </div>
-                        <div class="form-group" data-field="prompt">
-                            <label for="step-prompt-template">Message Template</label>
-                            <textarea id="step-prompt-template" rows="4" class="settings-input" placeholder="Send a message to ChatGPT. Use {steps.stepId.response} to access previous step data."></textarea>
-                            <div class="help-text">Access previous step data: {steps.stepId.response} for prompts, {steps.stepId.data} for HTTP, {steps.stepId.status} for HTTP status</div>
-                        </div>
-                        <div class="form-group" data-field="template">
-                            <label for="step-template-input">Message Template</label>
-                            <textarea id="step-template-input" rows="4" class="settings-input" placeholder="Template with placeholders like {{item}}, {{index}}, {{total}} or {steps.stepId.data}..."></textarea>
-                            <label for="step-template-elements" style="margin-top: 8px;">Dynamic Elements (JSON array or function)</label>
-                            <textarea id="step-template-elements" rows="3" class="settings-input" placeholder='["item1", "item2", "item3"] or () => ["generated", "items"]'></textarea>
-                            <div class="help-text">Batch processing: {{item}} for current item, {steps.stepId.response} for previous step data</div>
-                        </div>
-                        <div class="form-group" data-field="http">
-                            <label>HTTP Request</label>
-                            <input id="step-http-url" class="settings-input" placeholder="https://api.example.com/data or {steps.stepId.data.apiUrl}">
-                            <div style="display:flex; gap:8px; margin-top:6px;">
-                                <select id="step-http-method" class="settings-input"><option>GET</option><option>POST</option><option>PUT</option><option>DELETE</option></select>
-                                <input id="step-http-headers" class="settings-input" placeholder='{"Authorization": "Bearer {steps.authStep.data.token}"}'>
-                            </div>
-                            <textarea id="step-http-body" rows="3" class="settings-input" placeholder="Request body: {steps.stepId.response} or JSON data"></textarea>
-                            <div class="help-text">Access response with {steps.thisStepId.data} or {steps.thisStepId.status}. Use previous step data in URL/headers/body.</div>
-                        </div>
-                        <div class="form-group" data-field="js">
-                            <label for="step-js-code">JavaScript Code</label>
-                            <textarea id="step-js-code" rows="6" class="settings-input" placeholder="// Access previous steps with steps.stepId.data or steps.stepId.response
-// Available: response, log, console, item, index, total, http, steps, lastResponse
-// Example: log('API response:', steps.httpStep.data);"></textarea>
-                            <div class="help-text">Access step data with <code>steps.stepId.data</code> or <code>steps.stepId.response</code>. Use <code>http</code> for API calls, <code>log()</code> for output.</div>
-                        </div>
-                        <div class="form-group">
-                            <label for="step-next-select">Next step</label>
-                            <select id="step-next-select" class="settings-input"></select>
-                        </div>
+                        <div class="progress-text">0/0</div>
                     </div>
-                    <div class="chain-modal-footer">
-                        <button class="btn btn-secondary" id="delete-step-btn">Delete</button>
-                        <button class="btn btn-primary" id="save-step-btn">Save</button>
+
+            <div class="automation-form">
+                        <div class="tab-container">
+                            <button class="tab-btn active" data-tab="composer">Composer</button>
+                            <button class="tab-btn" data-tab="settings">Settings</button>
+                        </div>
+
+                        <div class="tab-content active" id="composer-tab">
+                            <div class="form-group">
+                                <label>Composer Canvas:</label>
+                                <div class="composer-presets">
+                                    <div class="preset-row">
+                                        <input type="text" id="composer-preset-name-input" class="settings-input" placeholder="Preset name" style="flex: 1;">
+                                        <select id="composer-preset-select" class="settings-input" style="flex: 2;">
+                                            <option value="">Select preset...</option>
+                                        </select>
+                                        <button class="btn btn-secondary" id="save-composer-preset-btn" title="Save current configuration">💾</button>
+                                        <button class="btn btn-primary" id="load-composer-preset-btn" title="Load selected preset">📂</button>
+                                        <button class="btn btn-danger" id="delete-composer-preset-btn" title="Delete selected preset">🗑️</button>
+                                    </div>
+                                </div>
+                                <div id="chain-canvas" class="chain-canvas">
+                                    <div class="chain-toolbar">
+                                        <button class="btn btn-secondary" id="add-step-btn">Add Step</button>
+                                        <button class="btn btn-secondary" id="validate-chain-btn">Validate Chain</button>
+                                        <button class="btn btn-primary" id="run-chain-btn">Run Chain</button>
+                                    </div>
+                                    <div id="chain-cards" class="chain-cards"></div>
+                                </div>
+                                <div class="help-text">Visual editor for multi-step automation chains. Steps connect in sequence; supports templates and custom JavaScript execution.</div>
+                            </div>
+                            <div class="form-group">
+                                <label for="chain-json-input">Chain JSON (advanced):</label>
+                                <div class="code-editor">
+                                    <textarea id="chain-json-input" rows="6" placeholder='{
+    "entryId": "step-1",
+    "steps": [
+        {
+        "id": "step-1",
+        "type": "prompt",
+        "title": "Create message",
+        "template": "Hello {item}",
+        "next": "step-2"
+        },
+        {
+        "id": "step-2",
+        "type": "js",
+        "title": "Process response",
+        "code": "log(\"Processing: \" + steps[\"step-1\"].response);"
+        }
+    ]
+    }'></textarea>
+                                    <div class="editor-tools">
+                                        <button class="tool-btn" id="format-chain-json-btn" title="Format JSON">{ }</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="tab-content" id="settings-tab">
+                            <div class="form-group">
+                                <label>Debug mode:</label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="debug-mode-checkbox">
+                                    <span class="checkmark"></span>
+                                    Enable debug logging
+                                </label>
+                            </div>
+                            <div class="form-group">
+                                <label>Batch settings:</label>
+                                <div class="batch-controls">
+                                    <div class="batch-settings">
+                                        <label class="checkbox-label">
+                                            <input type="checkbox" id="loop-checkbox">
+                                            <span class="checkmark"></span>
+                                            Process all items in batch
+                                        </label>
+                                        <label class="checkbox-label">
+                                            <input type="checkbox" id="auto-remove-checkbox" checked>
+                                            <span class="checkmark"></span>
+                                            Remove processed items from queue
+                                        </label>
+                                        <label class="checkbox-label">
+                                            <input type="checkbox" id="new-chat-checkbox">
+                                            <span class="checkmark"></span>
+                                            Start new chat for each item
+                                        </label>
+                                        <div class="wait-time-control">
+                                            <label for="wait-time-input">Wait between items (ms):</label>
+                                            <input type="number" id="wait-time-input" min="100" max="30000" value="2000" step="100">
+                                        </div>
+                                    </div>
+                                    <div class="batch-actions">
+                                        <button id="stop-batch-btn" class="btn btn-danger" style="display: none;">Stop Batch</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="response-timeout-input">Response timeout (ms):</label>
+                                <input type="number" id="response-timeout-input" min="10000" max="6000000" step="1000" class="settings-input timeout">
+                            </div>
+                            <div class="form-group">
+                                <label>Panel size limits (px):</label>
+                                <div class="size-inputs-grid">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>Visibility:</label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="default-visible-checkbox">
+                                    <span class="checkmark"></span>
+                                    Show panel by default
+                                </label>
+                                <div class="help-text">Controls default visibility on page load. You can still toggle from the header button.</div>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <div class="automation-log" id="log-container">
+                        <div class="log-header">
+                            <span>Activity Log</span>
+                            <div class="log-header-controls">
+                                <button class="tool-btn" id="toggle-auto-scroll-btn" title="Toggle Auto-scroll">📜</button>
+                                <button class="tool-btn" id="clear-log-btn" title="Clear Log">🗑️</button>
+                            </div>
+                        </div>
+                        <div class="log-content"></div>
                     </div>
                 </div>
-            </div>
-        `;
+
+                <div class="resize-handle" id="resize-handle"></div>
+
+                <!-- Modal for editing a chain step -->
+                <div id="chain-step-modal" class="chain-modal" aria-hidden="true" style="display:none;">
+                    <div class="chain-modal-backdrop"></div>
+                    <div class="chain-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="chain-step-title">
+                        <div class="chain-modal-header">
+                            <h4 id="chain-step-title">Edit Step</h4>
+                            <div class="step-modal-presets">
+                                <select id="step-preset-select" class="settings-input" style="min-width: 120px;">
+                                    <option value="">Select preset...</option>
+                                </select>
+                                <button class="tool-btn" id="save-step-preset-btn" title="Save as preset">💾</button>
+                                <button class="tool-btn" id="delete-step-preset-btn" title="Delete preset">🗑️</button>
+                            </div>
+                            <button class="header-btn" id="close-step-modal-btn" aria-label="Close">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M18.3 5.71L12 12.01L5.7 5.71L4.29 7.12L10.59 13.42L4.29 19.72L5.7 21.13L12 14.83L18.3 21.13L19.71 19.72L13.41 13.42L19.71 7.12L18.3 5.71Z"/>
+                            </svg>
+                            </button>
+                        </div>
+                        <div class="chain-modal-body">
+                            <div class="form-group">
+                                <label for="step-id-input">ID</label>
+                                <input id="step-id-input" class="settings-input" placeholder="step-1">
+                            </div>
+                            <div class="form-group">
+                                <label for="step-title-input">Title</label>
+                                <input id="step-title-input" class="settings-input" placeholder="Describe the step">
+                            </div>
+                            <div class="form-group">
+                                <label for="step-type-select">Type</label>
+                                <select id="step-type-select" class="settings-input">
+                                    <option value="prompt">Prompt</option>
+                                    <option value="template">Template (Batch)</option>
+                                    <option value="js">JavaScript</option>
+                                    <option value="http">HTTP Request</option>
+                                </select>
+                            </div>
+                            <div class="form-group" data-field="prompt">
+                                <label for="step-prompt-template">Message Template</label>
+                                <textarea id="step-prompt-template" rows="4" class="settings-input" placeholder="Send a message to ChatGPT. Use {steps.stepId.response} to access previous step data."></textarea>
+                                <div class="help-text">Access previous step data: {steps.stepId.response} for prompts, {steps.stepId.data} for HTTP, {steps.stepId.status} for HTTP status</div>
+                            </div>
+                            <div class="form-group" data-field="template">
+                                <label for="step-template-input">Message Template</label>
+                                <textarea id="step-template-input" rows="4" class="settings-input" placeholder="Template with placeholders like {{item}}, {{index}}, {{total}} or {steps.stepId.data}..."></textarea>
+                                <label for="step-template-elements" style="margin-top: 8px;">Dynamic Elements (JSON array or function)</label>
+                                <textarea id="step-template-elements" rows="3" class="settings-input" placeholder='["item1", "item2", "item3"] or () => ["generated", "items"]'></textarea>
+                                <div class="help-text">Batch processing: {{item}} for current item, {steps.stepId.response} for previous step data</div>
+                            </div>
+                            <div class="form-group" data-field="http">
+                                <label>HTTP Request</label>
+                                <input id="step-http-url" class="settings-input" placeholder="https://api.example.com/data or {steps.stepId.data.apiUrl}">
+                                <div style="display:flex; gap:8px; margin-top:6px;">
+                                    <select id="step-http-method" class="settings-input"><option>GET</option><option>POST</option><option>PUT</option><option>DELETE</option></select>
+                                    <input id="step-http-headers" class="settings-input" placeholder='{"Authorization": "Bearer {steps.authStep.data.token}"}'>
+                                </div>
+                                <textarea id="step-http-body" rows="3" class="settings-input" placeholder="Request body: {steps.stepId.response} or JSON data"></textarea>
+                                <div class="help-text">Access response with {steps.thisStepId.data} or {steps.thisStepId.status}. Use previous step data in URL/headers/body.</div>
+                            </div>
+                            <div class="form-group" data-field="js">
+                                <label for="step-js-code">JavaScript Code</label>
+                                <textarea id="step-js-code" rows="6" class="settings-input" placeholder="// Access previous steps with steps.stepId.data or steps.stepId.response
+    // Available: response, log, console, item, index, total, http, steps, lastResponse
+    // Example: log('API response:', steps.httpStep.data);"></textarea>
+                                <div class="help-text">Access step data with <code>steps.stepId.data</code> or <code>steps.stepId.response</code>. Use <code>http</code> for API calls, <code>log()</code> for output.</div>
+                            </div>
+                            <div class="form-group">
+                                <label for="step-next-select">Next step</label>
+                                <select id="step-next-select" class="settings-input"></select>
+                            </div>
+                        </div>
+                        <div class="chain-modal-footer">
+                            <button class="btn btn-secondary" id="delete-step-btn">Delete</button>
+                            <button class="btn btn-primary" id="save-step-btn">Save</button>
+                        </div>
+                    </div>
+                </div>
+            `;
 
         // Add styles with ChatGPT-inspired design (guard against duplicates)
         let style = document.getElementById('chatgpt-automation-style');
@@ -873,746 +780,719 @@
             style = document.createElement('style');
             style.id = 'chatgpt-automation-style';
             style.textContent = `
-            /* Base styles that adapt to ChatGPT's theme (scoped) */
-            #chatgpt-automation-ui {
-                position: fixed;
-                top: 20px;
-                right: 20px;
-                width: 380px;
-                min-width: ${CONFIG.MIN_WIDTH}px;
-                max-width: ${CONFIG.MAX_WIDTH}px;
-                min-height: ${CONFIG.MIN_HEIGHT}px;
-                max-height: ${CONFIG.MAX_HEIGHT}px;
-                background: var(--main-surface-primary, #ffffff);
-                border: 1px solid var(--border-medium, rgba(0,0,0,0.1));
-                border-radius: 12px;
-                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
-                font-family: var(--font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
-                z-index: 10000;
-                resize: both;
-                overflow: hidden;
-                backdrop-filter: blur(10px);
-                transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            }
-
-            #chatgpt-automation-ui.dark-mode {
-                background: var(--main-surface-primary, #2d2d30);
-                border-color: var(--border-medium, rgba(255,255,255,0.1));
-                color: var(--text-primary, #ffffff);
-            }
-
-            #chatgpt-automation-ui.minimized {
-                /* Keep panel fully resizable when minimized */
-                resize: both;
-                /* Do not override height in minimized mode; user controls size */
-            }
-            #chatgpt-automation-ui.minimized .automation-content {
-                display: flex;
-                flex-direction: column;
-                min-height: 0;
-                height: calc(100% - 60px); /* Account for header height */
-            }
-            #chatgpt-automation-ui.minimized .progress-container,
-            #chatgpt-automation-ui.minimized .automation-form {
-                display: none;
-            }
-            #chatgpt-automation-ui.minimized .automation-log {
-                display: flex !important;
-                flex-direction: column;
-                /* occupy the available area while minimized */
-                flex: 1 1 auto;
-                min-height: 0;
-                height: 100%;
-            }
-            #chatgpt-automation-ui.minimized #log-container {
-                flex: 1 1 auto;
-                min-height: 0;
-                overflow: hidden;
-                height: 100%;
-            }
-            #chatgpt-automation-ui.minimized .log-content {
-                /* Let logs fill available space and scroll internally */
-                flex: 1 1 auto;
-                min-height: 0;
-                overflow-y: auto;
-                height: calc(100% - 50px); /* Account for log header */
-            }
-            #chatgpt-automation-ui.minimized .automation-header {
-                position: sticky;
-                top: 0;
-                z-index: 1;
-            }
-
-            #chatgpt-automation-ui .automation-header {
-                background: linear-gradient(135deg, var(--brand-purple, #6366f1) 0%, var(--brand-purple-darker, #4f46e5) 100%);
-                color: white;
-                padding: 12px 16px;
-                border-radius: 12px 12px 0 0;
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                cursor: move;
-                user-select: none;
-            }
-
-            #chatgpt-automation-ui .automation-header h3 {
-                margin: 0;
-                font-size: 15px;
-                font-weight: 600;
-                flex: 1;
-            }
-
-            #chatgpt-automation-ui .header-controls {
-                display: flex;
-                align-items: center;
-                gap: 12px;
-            }
-
-            #chatgpt-automation-ui .status-indicator {
-                display: flex;
-                align-items: center;
-                gap: 6px;
-                font-size: 11px;
-                opacity: 0.9;
-            }
-
-            #chatgpt-automation-ui .status-dot {
-                width: 6px;
-                height: 6px;
-                border-radius: 50%;
-                background: #10b981;
-                animation: pulse-idle 2s infinite;
-            }
-
-            #chatgpt-automation-ui .header-btn {
-                background: rgba(255, 255, 255, 0.1);
-                border: none;
-                border-radius: 4px;
-                padding: 4px;
-                color: white;
-                cursor: pointer;
-                transition: background 0.2s;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-            }
-
-            #chatgpt-automation-ui .header-btn:hover {
-                background: rgba(255, 255, 255, 0.2);
-            }
-
-            #chatgpt-automation-ui .automation-content {
-                display: flex;
-                flex-direction: column;
-                overflow: hidden;
-                /* Allow children to shrink/scroll correctly inside flex */
-                min-height: 0;
-                -webkit-overflow-scrolling: touch;
-            }
-
-            #chatgpt-automation-ui .progress-container {
-                padding: 12px 16px;
-                border-bottom: 1px solid var(--border-light, rgba(0,0,0,0.06));
-                background: var(--surface-secondary, #f8fafc);
-            }
-
-            #chatgpt-automation-ui.dark-mode .progress-container {
-                background: var(--surface-secondary, #1e1e20);
-                border-color: var(--border-light, rgba(255,255,255,0.06));
-            }
-
-            #chatgpt-automation-ui .progress-bar {
-                width: 100%;
-                height: 4px;
-                background: var(--border-light, rgba(0,0,0,0.1));
-                border-radius: 2px;
-                overflow: hidden;
-                margin-bottom: 4px;
-            }
-
-            #chatgpt-automation-ui .progress-fill {
-                height: 100%;
-                background: var(--brand-purple, #6366f1);
-                transition: width 0.3s ease;
-            }
-
-            #chatgpt-automation-ui .progress-text {
-                font-size: 11px;
-                color: var(--text-secondary, #6b7280);
-                text-align: center;
-            }
-
-            #chatgpt-automation-ui .automation-form {
-                padding: 16px;
-                /* Let the form take its natural height so logs can fill the rest */
-                flex: 0 1 auto;
-                overflow: auto;
-            }
-
-            #chatgpt-automation-ui .tab-container {
-                display: flex;
-                border-bottom: 1px solid var(--border-light, rgba(0,0,0,0.06));
-                margin-bottom: 16px;
-            }
-
-            #chatgpt-automation-ui.dark-mode .tab-container {
-                border-color: var(--border-light, rgba(255,255,255,0.06));
-            }
-
-            #chatgpt-automation-ui .tab-btn {
-                background: none;
-                border: none;
-                padding: 8px 16px;
-                cursor: pointer;
-                color: var(--text-secondary, #6b7280);
-                font-size: 13px;
-                font-weight: 500;
-                border-bottom: 2px solid transparent;
-                transition: all 0.2s;
-            }
-
-            #chatgpt-automation-ui .tab-btn.active {
-                color: var(--brand-purple, #6366f1);
-                border-color: var(--brand-purple, #6366f1);
-            }
-
-            #chatgpt-automation-ui .tab-content {
-                display: none;
-            }
-
-            #chatgpt-automation-ui .tab-content.active {
-                display: block;
-            }
-
-            #chatgpt-automation-ui .form-group {
-                margin-bottom: 16px;
-            }
-
-            #chatgpt-automation-ui .form-group label {
-                display: block;
-                margin-bottom: 6px;
-                font-weight: 500;
-                color: var(--text-primary, #374151);
-                font-size: 13px;
-            }
-
-            #chatgpt-automation-ui.dark-mode .form-group label {
-                color: var(--text-primary, #f3f4f6);
-            }
-
-            #chatgpt-automation-ui .form-group textarea {
-                width: 100%;
-                padding: 10px 12px;
-                border: 1px solid var(--border-medium, rgba(0,0,0,0.1));
-                border-radius: 8px;
-                font-size: 13px;
-                resize: vertical;
-                font-family: 'SF Mono', 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-                box-sizing: border-box;
-                background: var(--input-background, #ffffff);
-                color: var(--text-primary, #374151);
-                transition: border-color 0.2s, box-shadow 0.2s;
-            }
-
-            #chatgpt-automation-ui.dark-mode .form-group textarea {
-                background: var(--input-background, #1e1e20);
-                color: var(--text-primary, #f3f4f6);
-                border-color: var(--border-medium, rgba(255,255,255,0.1));
-            }
-
-            #chatgpt-automation-ui .form-group textarea:focus {
-                outline: none;
-                border-color: var(--brand-purple, #6366f1);
-                box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
-            }
-
-            #chatgpt-automation-ui .code-editor {
-                position: relative;
-            }
-
-            #chatgpt-automation-ui .editor-tools {
-                position: absolute;
-                top: 8px;
-                right: 8px;
-                display: flex;
-                gap: 4px;
-                opacity: 0;
-                transition: opacity 0.2s;
-            }
-
-            #chatgpt-automation-ui .code-editor:hover .editor-tools {
-                opacity: 1;
-            }
-
-            #chatgpt-automation-ui .tool-btn {
-                background: var(--surface-secondary, rgba(0,0,0,0.05));
-                border: none;
-                border-radius: 4px;
-                padding: 4px 6px;
-                font-size: 10px;
-                cursor: pointer;
-                color: var(--text-secondary, #6b7280);
-                transition: background 0.2s;
-            }
-
-            #chatgpt-automation-ui .tool-btn:hover {
-                background: var(--surface-secondary, rgba(0,0,0,0.1));
-            }
-
-            #chatgpt-automation-ui .help-text {
-                font-size: 11px;
-                color: var(--text-secondary, #6b7280);
-                margin-top: 4px;
-                font-style: italic;
-            }
-
-            #chatgpt-automation-ui .batch-controls {
-                margin-top: 12px;
-                padding: 12px;
-                background: var(--surface-secondary, #f8fafc);
-                border-radius: 6px;
-            }
-
-            #chatgpt-automation-ui.dark-mode .batch-controls {
-                background: var(--surface-secondary, #1e1e20);
-            }
-
-            #chatgpt-automation-ui .batch-settings {
-                display: flex;
-                flex-direction: column;
-                gap: 8px;
-                margin-bottom: 12px;
-            }
-
-            #chatgpt-automation-ui .batch-actions {
-                display: flex;
-                gap: 8px;
-                flex-wrap: wrap;
-                justify-content: flex-end;
-            }
-
-            #chatgpt-automation-ui .wait-time-control {
-                display: flex;
-                align-items: center;
-                gap: 8px;
-                margin-top: 4px;
-            }
-
-            #chatgpt-automation-ui .wait-time-control label {
-                font-size: 12px;
-                margin: 0;
-                white-space: nowrap;
-                color: var(--text-primary, #374151);
-            }
-
-            #chatgpt-automation-ui.dark-mode .wait-time-control label {
-                color: var(--text-primary, #f3f4f6);
-            }
-
-            #chatgpt-automation-ui .wait-time-control input[type="number"] {
-                width: 80px;
-                padding: 4px 8px;
-                border: 1px solid var(--border-medium, rgba(0,0,0,0.1));
-                border-radius: 4px;
-                font-size: 12px;
-                background: var(--input-background, #ffffff);
-                color: var(--text-primary, #374151);
-            }
-
-            #chatgpt-automation-ui.dark-mode .wait-time-control input[type="number"] {
-                background: var(--input-background, #1e1e20);
-                color: var(--text-primary, #f3f4f6);
-                border-color: var(--border-medium, rgba(255,255,255,0.1));
-            }
-
-            #chatgpt-automation-ui .wait-time-control input[type="number"]:focus {
-                outline: none;
-                border-color: var(--brand-purple, #6366f1);
-                box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.1);
-            }
-
-            /* Settings input styles */
-            #chatgpt-automation-ui .settings-input {
-                padding: 6px 8px;
-                border: 1px solid var(--border-medium, rgba(0,0,0,0.1));
-                border-radius: 6px;
-                font-size: 13px;
-                background: var(--input-background, #ffffff);
-                color: var(--text-primary, #374151);
-            }
-
-            #chatgpt-automation-ui.dark-mode .settings-input {
-                background: var(--input-background, #1e1e20);
-                color: var(--text-primary, #f3f4f6);
-                border-color: var(--border-medium, rgba(255,255,255,0.1));
-            }
-
-            #chatgpt-automation-ui .settings-input:focus {
-                outline: none;
-                border-color: var(--brand-purple, #6366f1);
-                box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
-            }
-
-            #chatgpt-automation-ui .settings-input.timeout {
-                width: 140px;
-            }
-
-            #chatgpt-automation-ui .size-inputs-grid {
-                display: flex;
-                gap: 8px;
-                flex-wrap: wrap;
-            }
-
-            #chatgpt-automation-ui .size-input-group {
-                display: flex;
-                flex-direction: column;
-                gap: 4px;
-            }
-
-            #chatgpt-automation-ui .size-input-group label {
-                font-size: 12px;
-                margin: 0;
-                color: var(--text-primary, #374151);
-            }
-
-            #chatgpt-automation-ui.dark-mode .size-input-group label {
-                color: var(--text-primary, #f3f4f6);
-            }
-
-            #chatgpt-automation-ui .settings-input.size {
-                width: 120px;
-            }
-
-            #chatgpt-automation-ui .checkbox-label {
-                display: flex;
-                align-items: center;
-                cursor: pointer;
-                font-size: 13px;
-                color: var(--text-primary, #374151);
-            }
-
-            #chatgpt-automation-ui.dark-mode .checkbox-label {
-                color: var(--text-primary, #f3f4f6);
-            }
-
-            #chatgpt-automation-ui .checkbox-label input[type="checkbox"] {
-                margin-right: 8px;
-            }
-
-            #chatgpt-automation-ui .form-actions {
-                display: flex;
-                gap: 8px;
-                flex-wrap: wrap;
-                margin-top: 16px;
-            }
-
-            #chatgpt-automation-ui .btn {
-                padding: 8px 16px;
-                border: none;
-                border-radius: 6px;
-                font-size: 13px;
-                font-weight: 500;
-                cursor: pointer;
-                transition: all 0.2s;
-                display: flex;
-                align-items: center;
-                gap: 6px;
-                position: relative;
-            }
-
-            #chatgpt-automation-ui .btn-primary {
-                background: var(--brand-purple, #6366f1);
-                color: white;
-            }
-
-            #chatgpt-automation-ui .btn-primary:hover {
-                background: var(--brand-purple-darker, #4f46e5);
-            }
-
-            #chatgpt-automation-ui .btn-secondary {
-                background: var(--surface-secondary, #f3f4f6);
-                color: var(--text-primary, #374151);
-                border: 1px solid var(--border-light, rgba(0,0,0,0.06));
-            }
-
-            #chatgpt-automation-ui.dark-mode .btn-secondary {
-                background: var(--surface-secondary, #1e1e20);
-                color: var(--text-primary, #f3f4f6);
-                border-color: var(--border-light, rgba(255,255,255,0.06));
-            }
-
-            #chatgpt-automation-ui .btn-secondary:hover {
-                background: var(--surface-secondary, #e5e7eb);
-            }
-
-            #chatgpt-automation-ui.dark-mode .btn-secondary:hover {
-                background: var(--surface-secondary, #2a2a2d);
-            }
-
-            #chatgpt-automation-ui .btn-danger {
-                background: #ef4444;
-                color: white;
-            }
-
-            #chatgpt-automation-ui .btn-danger:hover {
-                background: #dc2626;
-            }
-
-            #chatgpt-automation-ui .btn-warning {
-                background: #f59e0b;
-                color: white;
-            }
-
-            #chatgpt-automation-ui .btn-warning:hover {
-                background: #d97706;
-            }
-
-            #chatgpt-automation-ui .btn:disabled {
-                opacity: 0.5;
-                cursor: not-allowed;
-            }
-
-            #chatgpt-automation-ui .spinner {
-                width: 12px;
-                height: 12px;
-                border: 2px solid rgba(255, 255, 255, 0.3);
-                border-top: 2px solid white;
-                border-radius: 50%;
-                animation: spin 1s linear infinite;
-            }
-
-            @keyframes spin {
-                0% { transform: rotate(0deg); }
-                100% { transform: rotate(360deg); }
-            }
-
-            #chatgpt-automation-ui .automation-log {
-                border-top: 1px solid var(--border-light, rgba(0,0,0,0.06));
-                /* Fill remaining space under the form */
-                flex: 1 1 auto;
-                overflow: hidden;
-                display: flex;
-                flex-direction: column;
-                /* allow internal scrolling via .log-content */
-                min-height: 0;
-            }
-
-            #chatgpt-automation-ui.dark-mode .automation-log {
-                border-color: var(--border-light, rgba(255,255,255,0.06));
-            }
-
-            #chatgpt-automation-ui .log-header {
-                padding: 12px 16px;
-                background: var(--surface-secondary, #f8fafc);
-                font-weight: 500;
-                font-size: 13px;
-                color: var(--text-primary, #374151);
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-            }
-
-            #chatgpt-automation-ui.dark-mode .log-header {
-                background: var(--surface-secondary, #1e1e20);
-                color: var(--text-primary, #f3f4f6);
-            }
-
-            #chatgpt-automation-ui .log-header-controls {
-                display: flex;
-                gap: 4px;
-            }
-
-            #chatgpt-automation-ui .log-content {
-                padding: 16px;
-                overflow-y: auto;
-                scroll-behavior: smooth;
-                flex: 1 1 auto;
-                min-height: 0;
-                /* Ensure the content area reserves space under the log header and scrolls correctly */
-                height: calc(100% - 50px);
-                box-sizing: border-box;
-            }
-
-            #chatgpt-automation-ui #step-next-select {
-                width: 100%;
-            }
-
-            #chatgpt-automation-ui .log-entry {
-                padding: 6px 0;
-                font-size: 11px;
-                font-family: 'SF Mono', 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-                border-bottom: 1px solid var(--border-light, rgba(0,0,0,0.03));
-                line-height: 1.4;
-            }
-
-            #chatgpt-automation-ui .log-entry:last-child {
-                border-bottom: none;
-                margin-bottom: 6px; /* extra space below last entry */
-            }
-
-            #chatgpt-automation-ui .log-info {
-                color: var(--text-primary, #374151);
-            }
-
-            #chatgpt-automation-ui.dark-mode .log-info {
-                color: var(--text-primary, #d1d5db);
-            }
-
-            #chatgpt-automation-ui .log-warning {
-                color: #f59e0b;
-            }
-
-            #chatgpt-automation-ui .log-error {
-                color: #ef4444;
-            }
-
-            #chatgpt-automation-ui .resize-handle {
-                position: absolute;
-                bottom: 0;
-                right: 0;
-                width: 20px;
-                height: 20px;
-                cursor: nw-resize;
-                background: linear-gradient(-45deg, transparent 0%, transparent 40%, var(--border-medium, rgba(0,0,0,0.1)) 40%, var(--border-medium, rgba(0,0,0,0.1)) 60%, transparent 60%, transparent 100%);
-            }
-
-            /* Chain canvas styles */
-            #chatgpt-automation-ui .chain-canvas {
-                border: 1px dashed var(--border-light, rgba(0,0,0,0.1));
-                border-radius: 8px;
-                padding: 8px;
-                min-height: 120px;
-            }
-            #chatgpt-automation-ui .chain-toolbar { display:flex; gap:8px; margin-bottom:8px; flex-wrap:wrap; }
-            #chatgpt-automation-ui .chain-cards { display:flex; gap:8px; flex-wrap:wrap; align-items:flex-start; min-height: 80px; }
-
-            /* Empty chain cards container */
-            #chatgpt-automation-ui .chain-cards:empty {
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                background: var(--surface-secondary, #f8fafc);
-                border: 2px dashed var(--border-medium, rgba(0,0,0,0.15));
-                border-radius: 12px;
-                padding: 32px 16px;
-                text-align: center;
-                color: var(--text-secondary, #6b7280);
-                font-size: 14px;
-                transition: all 0.2s ease;
-            }
-            #chatgpt-automation-ui.dark-mode .chain-cards:empty {
-                background: var(--surface-secondary, #1e1e20);
-                border-color: var(--border-medium, rgba(255,255,255,0.15));
-                color: var(--text-secondary, #9ca3af);
-            }
-            #chatgpt-automation-ui .chain-cards:empty::before {
-                content: "🔗 No steps yet. Click 'Add Step' to start building your automation chain.";
-                font-weight: 500;
-            }
-
-            #chatgpt-automation-ui .chain-card {
-                background: var(--surface-secondary, #f8fafc);
-                border: 1px solid var(--border-light, rgba(0,0,0,0.06));
-                border-radius: 8px;
-                padding: 8px;
-                min-width: 140px;
-                max-width: 200px;
-                position: relative;
-                transition: all 0.2s ease;
-            }
-            #chatgpt-automation-ui .chain-card:hover {
-                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-                transform: translateY(-1px);
-            }
-            #chatgpt-automation-ui.dark-mode .chain-card { background: var(--surface-secondary, #1e1e20); border-color: var(--border-light, rgba(255,255,255,0.06)); }
-            #chatgpt-automation-ui.dark-mode .chain-card:hover {
-                box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-            }
-            #chatgpt-automation-ui .chain-card .title { font-weight: 600; font-size: 12px; margin-bottom: 4px; }
-            #chatgpt-automation-ui .chain-card .meta { font-size: 11px; opacity: 0.8; margin-bottom: 6px; }
-            #chatgpt-automation-ui .chain-card .actions { display: flex; gap: 6px; }
-
-            /* Composer presets */
-            #chatgpt-automation-ui .composer-presets {
-                margin-bottom: 12px;
-                padding: 8px;
-                background: var(--surface-secondary, #f8fafc);
-                border-radius: 8px;
-                border: 1px solid var(--border-light, rgba(0,0,0,0.06));
-            }
-            #chatgpt-automation-ui.dark-mode .composer-presets {
-                background: var(--surface-secondary, #1e1e20);
-                border-color: var(--border-light, rgba(255,255,255,0.06));
-            }
-            #chatgpt-automation-ui .composer-presets .preset-row {
-                display: flex;
-                gap: 8px;
-                align-items: center;
-            }
-
-            /* Modal */
-            #chatgpt-automation-ui .chain-modal { position: fixed; inset:0; z-index:10001; }
-            #chatgpt-automation-ui .chain-modal-backdrop { position:absolute; inset:0; background: rgba(0,0,0,0.3); }
-            #chatgpt-automation-ui .chain-modal-dialog { position:relative; background: var(--main-surface-primary, #fff); width: 520px; max-width: calc(100% - 32px); margin: 40px auto; border-radius: 10px; box-shadow: 0 8px 30px rgba(0,0,0,0.2); overflow:hidden; }
-            #chatgpt-automation-ui.dark-mode .chain-modal-dialog { background: var(--main-surface-primary, #2d2d30); }
-            #chatgpt-automation-ui .chain-modal-header {
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                padding: 12px 16px;
-                border-bottom: 1px solid var(--border-light, rgba(0,0,0,0.06));
-                gap: 12px;
-            }
-            #chatgpt-automation-ui .step-modal-presets {
-                display: flex;
-                gap: 8px;
-                align-items: center;
-            }
-            #chatgpt-automation-ui .chain-modal-body { padding: 12px 16px; max-height:60vh; overflow:auto; }
-            #chatgpt-automation-ui .chain-modal-footer { display:flex; gap:8px; justify-content:flex-end; padding:12px 16px; border-top:1px solid var(--border-light, rgba(0,0,0,0.06)); }
-
-            #chatgpt-automation-ui .presets-grid .preset-row { display:flex; gap:8px; margin-bottom:8px; flex-wrap:wrap; }
-
-            /* Responsive design */
-            @media (max-width: 768px) {
+                /* Base styles that adapt to ChatGPT's theme (scoped) */
                 #chatgpt-automation-ui {
-                    width: 320px;
-                    right: 10px;
-                    top: 10px;
+                    position: fixed;
+                    top: 20px;
+                    right: 20px;
+                    height: auto;
+                    width: auto;
+                    background: var(--main-surface-primary, #ffffff);
+                    border: 1px solid var(--border-medium, rgba(0,0,0,0.1));
+                    border-radius: 12px;
+                    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+                    font-family: var(--font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
+                    z-index: 10000;
+                    resize: both;
+                    overflow: hidden;
+                    backdrop-filter: blur(10px);
+                    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                    
                 }
-            }
 
-            /* Animation keyframes */
-            @keyframes pulse-idle {
-                0%, 100% { opacity: 1; }
-                50% { opacity: 0.5; }
-            }
+                #chatgpt-automation-ui.dark-mode {
+                    background: var(--main-surface-primary, #2d2d30);
+                    border-color: var(--border-medium, rgba(255,255,255,0.1));
+                    color: var(--text-primary, #ffffff);
+                }
 
-            @keyframes pulse-processing {
-                0%, 100% { opacity: 1; transform: scale(1); }
-                50% { opacity: 0.7; transform: scale(1.2); }
-            }
+                #chatgpt-automation-ui.minimized {
+                    resize: both;
+                    height: 48px;
+                }
+                #chatgpt-automation-ui.minimized.log-open {
+                    height: 300px;
+                }
+                /* Hide main form when minimized */
+                #chatgpt-automation-ui.minimized .automation-form {
+                    display: none;
+                }
 
-            #chatgpt-automation-ui .status-processing .status-dot {
-                background: #f59e0b;
-                animation: pulse-processing 1s infinite;
-            }
+                /* Base content layout mirrors minimized behavior */
+                #chatgpt-automation-ui .automation-content {
+                    display: flex;
+                    flex-direction: column;
+                    min-height: 0;
+                    height: calc(100% - 60px); /* Header height offset */
+                }
 
-            #chatgpt-automation-ui .status-waiting .status-dot {
-                background: #3b82f6;
-                animation: pulse-processing 1.5s infinite;
-            }
+                #chatgpt-automation-ui .automation-header {
+                    background: linear-gradient(135deg, var(--brand-purple, #6366f1) 0%, var(--brand-purple-darker, #4f46e5) 100%);
+                    color: white;
+                    padding: 12px 16px;
+                    border-radius: 12px 12px 0 0;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    cursor: move;
+                    user-select: none;
+                }
 
-            #chatgpt-automation-ui .status-complete .status-dot {
-                background: #10b981;
-                animation: none;
-            }
+                #chatgpt-automation-ui .automation-header h3 {
+                    margin: 0;
+                    font-size: 15px;
+                    font-weight: 600;
+                    flex: 1;
+                }
 
-            #chatgpt-automation-ui .status-error .status-dot {
-                background: #ef4444;
-                animation: pulse-processing 0.5s infinite;
-            }
-        `;
+                #chatgpt-automation-ui .header-controls {
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                }
+
+                #chatgpt-automation-ui .status-indicator {
+                    display: flex;
+                    align-items: center;
+                    gap: 6px;
+                    font-size: 11px;
+                    opacity: 0.9;
+                }
+
+                #chatgpt-automation-ui .status-dot {
+                    width: 6px;
+                    height: 6px;
+                    border-radius: 50%;
+                    background: #10b981;
+                    animation: pulse-idle 2s infinite;
+                }
+
+                #chatgpt-automation-ui .header-btn {
+                    background: rgba(255, 255, 255, 0.1);
+                    border: none;
+                    border-radius: 4px;
+                    padding: 4px;
+                    color: white;
+                    cursor: pointer;
+                    transition: background 0.2s;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                }
+
+                #chatgpt-automation-ui .header-btn:hover {
+                    background: rgba(255, 255, 255, 0.2);
+                }
+
+                #chatgpt-automation-ui .automation-content {
+                    display: flex;
+                    flex-direction: column;
+                    overflow: hidden;
+                    /* Allow children to shrink/scroll correctly inside flex */
+                    min-height: 0;
+                    -webkit-overflow-scrolling: touch;
+                }
+
+                #chatgpt-automation-ui .progress-container {
+                    padding: 12px 16px;
+                    border-bottom: 1px solid var(--border-light, rgba(0,0,0,0.06));
+                    background: var(--surface-secondary, #f8fafc);
+                }
+
+                #chatgpt-automation-ui.dark-mode .progress-container {
+                    background: var(--surface-secondary, #1e1e20);
+                    border-color: var(--border-light, rgba(255,255,255,0.06));
+                }
+
+                #chatgpt-automation-ui .progress-bar {
+                    width: 100%;
+                    height: 4px;
+                    background: var(--border-light, rgba(0,0,0,0.1));
+                    border-radius: 2px;
+                    overflow: hidden;
+                    margin-bottom: 4px;
+                }
+
+                #chatgpt-automation-ui .progress-fill {
+                    height: 100%;
+                    background: var(--brand-purple, #6366f1);
+                    transition: width 0.3s ease;
+                }
+
+                #chatgpt-automation-ui .progress-text {
+                    font-size: 11px;
+                    color: var(--text-secondary, #6b7280);
+                    text-align: center;
+                }
+
+                #chatgpt-automation-ui .automation-form {
+                    padding: 16px;
+                    /* Keep natural height so logs fill remaining space */
+                    flex: 0 0 auto;
+                    overflow: auto;
+                }
+
+                #chatgpt-automation-ui .tab-container {
+                    display: flex;
+                    border-bottom: 1px solid var(--border-light, rgba(0,0,0,0.06));
+                    margin-bottom: 16px;
+                }
+
+                #chatgpt-automation-ui.dark-mode .tab-container {
+                    border-color: var(--border-light, rgba(255,255,255,0.06));
+                }
+
+                #chatgpt-automation-ui .tab-btn {
+                    background: none;
+                    border: none;
+                    padding: 8px 16px;
+                    cursor: pointer;
+                    color: var(--text-secondary, #6b7280);
+                    font-size: 13px;
+                    font-weight: 500;
+                    border-bottom: 2px solid transparent;
+                    transition: all 0.2s;
+                }
+
+                #chatgpt-automation-ui .tab-btn.active {
+                    color: var(--brand-purple, #6366f1);
+                    border-color: var(--brand-purple, #6366f1);
+                }
+
+                #chatgpt-automation-ui .tab-content {
+                    display: none;
+                }
+
+                #chatgpt-automation-ui .tab-content.active {
+                    display: block;
+                }
+
+                #chatgpt-automation-ui .form-group {
+                    margin-bottom: 16px;
+                }
+
+                #chatgpt-automation-ui .form-group label {
+                    display: block;
+                    margin-bottom: 6px;
+                    font-weight: 500;
+                    color: var(--text-primary, #374151);
+                    font-size: 13px;
+                }
+
+                #chatgpt-automation-ui.dark-mode .form-group label {
+                    color: var(--text-primary, #f3f4f6);
+                }
+
+                #chatgpt-automation-ui .form-group textarea {
+                    width: 100%;
+                    padding: 10px 12px;
+                    border: 1px solid var(--border-medium, rgba(0,0,0,0.1));
+                    border-radius: 8px;
+                    font-size: 13px;
+                    resize: vertical;
+                    font-family: 'SF Mono', 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+                    box-sizing: border-box;
+                    background: var(--input-background, #ffffff);
+                    color: var(--text-primary, #374151);
+                    transition: border-color 0.2s, box-shadow 0.2s;
+                }
+
+                #chatgpt-automation-ui.dark-mode .form-group textarea {
+                    background: var(--input-background, #1e1e20);
+                    color: var(--text-primary, #f3f4f6);
+                    border-color: var(--border-medium, rgba(255,255,255,0.1));
+                }
+
+                #chatgpt-automation-ui .form-group textarea:focus {
+                    outline: none;
+                    border-color: var(--brand-purple, #6366f1);
+                    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+                }
+
+                #chatgpt-automation-ui .code-editor {
+                    position: relative;
+                }
+
+                #chatgpt-automation-ui .editor-tools {
+                    position: absolute;
+                    top: 8px;
+                    right: 8px;
+                    display: flex;
+                    gap: 4px;
+                    opacity: 0;
+                    transition: opacity 0.2s;
+                }
+
+                #chatgpt-automation-ui .code-editor:hover .editor-tools {
+                    opacity: 1;
+                }
+
+                #chatgpt-automation-ui .tool-btn {
+                    background: var(--surface-secondary, rgba(0,0,0,0.05));
+                    border: none;
+                    border-radius: 4px;
+                    padding: 4px 6px;
+                    font-size: 10px;
+                    cursor: pointer;
+                    color: var(--text-secondary, #6b7280);
+                    transition: background 0.2s;
+                }
+
+                #chatgpt-automation-ui .tool-btn:hover {
+                    background: var(--surface-secondary, rgba(0,0,0,0.1));
+                }
+
+                #chatgpt-automation-ui .help-text {
+                    font-size: 11px;
+                    color: var(--text-secondary, #6b7280);
+                    margin-top: 4px;
+                    font-style: italic;
+                }
+
+                #chatgpt-automation-ui .batch-controls {
+                    margin-top: 12px;
+                    padding: 12px;
+                    background: var(--surface-secondary, #f8fafc);
+                    border-radius: 6px;
+                }
+
+                #chatgpt-automation-ui.dark-mode .batch-controls {
+                    background: var(--surface-secondary, #1e1e20);
+                }
+
+                #chatgpt-automation-ui .batch-settings {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 8px;
+                    margin-bottom: 12px;
+                }
+
+                #chatgpt-automation-ui .batch-actions {
+                    display: flex;
+                    gap: 8px;
+                    flex-wrap: wrap;
+                    justify-content: flex-end;
+                }
+
+                #chatgpt-automation-ui .wait-time-control {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    margin-top: 4px;
+                }
+
+                #chatgpt-automation-ui .wait-time-control label {
+                    font-size: 12px;
+                    margin: 0;
+                    white-space: nowrap;
+                    color: var(--text-primary, #374151);
+                }
+
+                #chatgpt-automation-ui.dark-mode .wait-time-control label {
+                    color: var(--text-primary, #f3f4f6);
+                }
+
+                #chatgpt-automation-ui .wait-time-control input[type="number"] {
+                    width: 80px;
+                    padding: 4px 8px;
+                    border: 1px solid var(--border-medium, rgba(0,0,0,0.1));
+                    border-radius: 4px;
+                    font-size: 12px;
+                    background: var(--input-background, #ffffff);
+                    color: var(--text-primary, #374151);
+                }
+
+                #chatgpt-automation-ui.dark-mode .wait-time-control input[type="number"] {
+                    background: var(--input-background, #1e1e20);
+                    color: var(--text-primary, #f3f4f6);
+                    border-color: var(--border-medium, rgba(255,255,255,0.1));
+                }
+
+                #chatgpt-automation-ui .wait-time-control input[type="number"]:focus {
+                    outline: none;
+                    border-color: var(--brand-purple, #6366f1);
+                    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.1);
+                }
+
+                /* Settings input styles */
+                #chatgpt-automation-ui .settings-input {
+                    padding: 6px 8px;
+                    border: 1px solid var(--border-medium, rgba(0,0,0,0.1));
+                    border-radius: 6px;
+                    font-size: 13px;
+                    background: var(--input-background, #ffffff);
+                    color: var(--text-primary, #374151);
+                }
+
+                #chatgpt-automation-ui.dark-mode .settings-input {
+                    background: var(--input-background, #1e1e20);
+                    color: var(--text-primary, #f3f4f6);
+                    border-color: var(--border-medium, rgba(255,255,255,0.1));
+                }
+
+                #chatgpt-automation-ui .settings-input:focus {
+                    outline: none;
+                    border-color: var(--brand-purple, #6366f1);
+                    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+                }
+
+                #chatgpt-automation-ui .settings-input.timeout {
+                    width: 140px;
+                }
+
+                #chatgpt-automation-ui .size-inputs-grid {
+                    display: flex;
+                    gap: 8px;
+                    flex-wrap: wrap;
+                }
+
+                #chatgpt-automation-ui .size-input-group {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 4px;
+                }
+
+                #chatgpt-automation-ui .size-input-group label {
+                    font-size: 12px;
+                    margin: 0;
+                    color: var(--text-primary, #374151);
+                }
+
+                #chatgpt-automation-ui.dark-mode .size-input-group label {
+                    color: var(--text-primary, #f3f4f6);
+                }
+
+                #chatgpt-automation-ui .settings-input.size {
+                    width: 120px;
+                }
+
+                #chatgpt-automation-ui .checkbox-label {
+                    display: flex;
+                    align-items: center;
+                    cursor: pointer;
+                    font-size: 13px;
+                    color: var(--text-primary, #374151);
+                }
+
+                #chatgpt-automation-ui.dark-mode .checkbox-label {
+                    color: var(--text-primary, #f3f4f6);
+                }
+
+                #chatgpt-automation-ui .checkbox-label input[type="checkbox"] {
+                    margin-right: 8px;
+                }
+
+                #chatgpt-automation-ui .form-actions {
+                    display: flex;
+                    gap: 8px;
+                    flex-wrap: wrap;
+                    margin-top: 16px;
+                }
+
+                #chatgpt-automation-ui .btn {
+                    padding: 8px 16px;
+                    border: none;
+                    border-radius: 6px;
+                    font-size: 13px;
+                    font-weight: 500;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                    display: flex;
+                    align-items: center;
+                    gap: 6px;
+                    position: relative;
+                }
+
+                #chatgpt-automation-ui .btn-primary {
+                    background: var(--brand-purple, #6366f1);
+                    color: white;
+                }
+
+                #chatgpt-automation-ui .btn-primary:hover {
+                    background: var(--brand-purple-darker, #4f46e5);
+                }
+
+                #chatgpt-automation-ui .btn-secondary {
+                    background: var(--surface-secondary, #f3f4f6);
+                    color: var(--text-primary, #374151);
+                    border: 1px solid var(--border-light, rgba(0,0,0,0.06));
+                }
+
+                #chatgpt-automation-ui.dark-mode .btn-secondary {
+                    background: var(--surface-secondary, #1e1e20);
+                    color: var(--text-primary, #f3f4f6);
+                    border-color: var(--border-light, rgba(255,255,255,0.06));
+                }
+
+                #chatgpt-automation-ui .btn-secondary:hover {
+                    background: var(--surface-secondary, #e5e7eb);
+                }
+
+                #chatgpt-automation-ui.dark-mode .btn-secondary:hover {
+                    background: var(--surface-secondary, #2a2a2d);
+                }
+
+                #chatgpt-automation-ui .btn-danger {
+                    background: #ef4444;
+                    color: white;
+                }
+
+                #chatgpt-automation-ui .btn-danger:hover {
+                    background: #dc2626;
+                }
+
+                #chatgpt-automation-ui .btn-warning {
+                    background: #f59e0b;
+                    color: white;
+                }
+
+                #chatgpt-automation-ui .btn-warning:hover {
+                    background: #d97706;
+                }
+
+                #chatgpt-automation-ui .btn:disabled {
+                    opacity: 0.5;
+                    cursor: not-allowed;
+                }
+
+                #chatgpt-automation-ui .spinner {
+                    width: 12px;
+                    height: 12px;
+                    border: 2px solid rgba(255, 255, 255, 0.3);
+                    border-top: 2px solid white;
+                    border-radius: 50%;
+                    animation: spin 1s linear infinite;
+                }
+
+                @keyframes spin {
+                    0% { transform: rotate(0deg); }
+                    100% { transform: rotate(360deg); }
+                }
+
+                #chatgpt-automation-ui .automation-log {
+                    border-top: 1px solid var(--border-light, rgba(0,0,0,0.06));
+                    /* Base height when expanded; can be resized */
+                    height: 250px;
+                    flex: 1 1 auto;
+                    overflow: hidden;
+                    display: flex;
+                    flex-direction: column;
+                    min-height: 0;
+                }
+
+                #chatgpt-automation-ui.dark-mode .automation-log {
+                    border-color: var(--border-light, rgba(255,255,255,0.06));
+                }
+
+                #chatgpt-automation-ui .log-header {
+                    padding: 12px 16px;
+                    background: var(--surface-secondary, #f8fafc);
+                    font-weight: 500;
+                    font-size: 13px;
+                    color: var(--text-primary, #374151);
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                }
+
+                #chatgpt-automation-ui.dark-mode .log-header {
+                    background: var(--surface-secondary, #1e1e20);
+                    color: var(--text-primary, #f3f4f6);
+                }
+
+                #chatgpt-automation-ui .log-header-controls {
+                    display: flex;
+                    gap: 4px;
+                }
+
+                #chatgpt-automation-ui .log-content {
+                    padding: 16px;
+                    overflow-y: auto;
+                    scroll-behavior: smooth;
+                    flex: 1 1 auto;
+                    min-height: 0;
+                }
+
+                #chatgpt-automation-ui #step-next-select {
+                    width: 100%;
+                }
+
+                #chatgpt-automation-ui .log-entry {
+                    padding: 6px 0;
+                    font-size: 11px;
+                    font-family: 'SF Mono', 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+                    border-bottom: 1px solid var(--border-light, rgba(0,0,0,0.03));
+                    line-height: 1.4;
+                }
+
+                #chatgpt-automation-ui .log-entry:last-child {
+                    border-bottom: none;
+                    margin-bottom: 6px; /* extra space below last entry */
+                }
+
+                #chatgpt-automation-ui .log-info {
+                    color: var(--text-primary, #374151);
+                }
+
+                #chatgpt-automation-ui.dark-mode .log-info {
+                    color: var(--text-primary, #d1d5db);
+                }
+
+                #chatgpt-automation-ui .log-warning {
+                    color: #f59e0b;
+                }
+
+                #chatgpt-automation-ui .log-error {
+                    color: #ef4444;
+                }
+
+                #chatgpt-automation-ui .resize-handle {
+                    position: absolute;
+                    bottom: 0;
+                    right: 0;
+                    width: 20px;
+                    height: 20px;
+                    cursor: nw-resize;
+                    background: linear-gradient(-45deg, transparent 0%, transparent 40%, var(--border-medium, rgba(0,0,0,0.1)) 40%, var(--border-medium, rgba(0,0,0,0.1)) 60%, transparent 60%, transparent 100%);
+                }
+
+                /* Chain canvas styles */
+                #chatgpt-automation-ui .chain-canvas {
+                    border: 1px dashed var(--border-light, rgba(0,0,0,0.1));
+                    border-radius: 8px;
+                    padding: 8px;
+                    min-height: 120px;
+                }
+                #chatgpt-automation-ui .chain-toolbar { display:flex; gap:8px; margin-bottom:8px; flex-wrap:wrap; }
+                #chatgpt-automation-ui .chain-cards { display:flex; gap:8px; flex-wrap:wrap; align-items:flex-start; min-height: 80px; }
+
+                /* Empty chain cards container */
+                #chatgpt-automation-ui .chain-cards:empty {
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    background: var(--surface-secondary, #f8fafc);
+                    border: 2px dashed var(--border-medium, rgba(0,0,0,0.15));
+                    border-radius: 12px;
+                    padding: 32px 16px;
+                    text-align: center;
+                    color: var(--text-secondary, #6b7280);
+                    font-size: 14px;
+                    transition: all 0.2s ease;
+                }
+                #chatgpt-automation-ui.dark-mode .chain-cards:empty {
+                    background: var(--surface-secondary, #1e1e20);
+                    border-color: var(--border-medium, rgba(255,255,255,0.15));
+                    color: var(--text-secondary, #9ca3af);
+                }
+                #chatgpt-automation-ui .chain-cards:empty::before {
+                    content: "🔗 No steps yet. Click 'Add Step' to start building your automation chain.";
+                    font-weight: 500;
+                }
+
+                #chatgpt-automation-ui .chain-card {
+                    background: var(--surface-secondary, #f8fafc);
+                    border: 1px solid var(--border-light, rgba(0,0,0,0.06));
+                    border-radius: 8px;
+                    padding: 8px;
+                    min-width: 140px;
+                    max-width: 200px;
+                    position: relative;
+                    transition: all 0.2s ease;
+                }
+                #chatgpt-automation-ui .chain-card:hover {
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                    transform: translateY(-1px);
+                }
+                #chatgpt-automation-ui.dark-mode .chain-card { background: var(--surface-secondary, #1e1e20); border-color: var(--border-light, rgba(255,255,255,0.06)); }
+                #chatgpt-automation-ui.dark-mode .chain-card:hover {
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+                }
+                #chatgpt-automation-ui .chain-card .title { font-weight: 600; font-size: 12px; margin-bottom: 4px; }
+                #chatgpt-automation-ui .chain-card .meta { font-size: 11px; opacity: 0.8; margin-bottom: 6px; }
+                #chatgpt-automation-ui .chain-card .actions { display: flex; gap: 6px; }
+
+                /* Composer presets */
+                #chatgpt-automation-ui .composer-presets {
+                    margin-bottom: 12px;
+                    padding: 8px;
+                    background: var(--surface-secondary, #f8fafc);
+                    border-radius: 8px;
+                    border: 1px solid var(--border-light, rgba(0,0,0,0.06));
+                }
+                #chatgpt-automation-ui.dark-mode .composer-presets {
+                    background: var(--surface-secondary, #1e1e20);
+                    border-color: var(--border-light, rgba(255,255,255,0.06));
+                }
+                #chatgpt-automation-ui .composer-presets .preset-row {
+                    display: flex;
+                    gap: 8px;
+                    align-items: center;
+                }
+
+                /* Modal */
+                #chatgpt-automation-ui .chain-modal { position: fixed; inset:0; z-index:10001; }
+                #chatgpt-automation-ui .chain-modal-backdrop { position:absolute; inset:0; background: rgba(0,0,0,0.3); }
+                #chatgpt-automation-ui .chain-modal-dialog { position:relative; background: var(--main-surface-primary, #fff); width: 520px; max-width: calc(100% - 32px); margin: 40px auto; border-radius: 10px; box-shadow: 0 8px 30px rgba(0,0,0,0.2); overflow:hidden; }
+                #chatgpt-automation-ui.dark-mode .chain-modal-dialog { background: var(--main-surface-primary, #2d2d30); }
+                #chatgpt-automation-ui .chain-modal-header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    padding: 12px 16px;
+                    border-bottom: 1px solid var(--border-light, rgba(0,0,0,0.06));
+                    gap: 12px;
+                }
+                #chatgpt-automation-ui .step-modal-presets {
+                    display: flex;
+                    gap: 8px;
+                    align-items: center;
+                }
+                #chatgpt-automation-ui .chain-modal-body { padding: 12px 16px; max-height:60vh; overflow:auto; }
+                #chatgpt-automation-ui .chain-modal-footer { display:flex; gap:8px; justify-content:flex-end; padding:12px 16px; border-top:1px solid var(--border-light, rgba(0,0,0,0.06)); }
+
+                #chatgpt-automation-ui .presets-grid .preset-row { display:flex; gap:8px; margin-bottom:8px; flex-wrap:wrap; }
+
+                /* Responsive design */
+                @media (max-width: 768px) {
+                    #chatgpt-automation-ui {
+                        width: 320px;
+                        right: 10px;
+                        top: 10px;
+                    }
+                }
+
+                /* Animation keyframes */
+                @keyframes pulse-idle {
+                    0%, 100% { opacity: 1; }
+                    50% { opacity: 0.5; }
+                }
+
+                @keyframes pulse-processing {
+                    0%, 100% { opacity: 1; transform: scale(1); }
+                    50% { opacity: 0.7; transform: scale(1.2); }
+                }
+
+                #chatgpt-automation-ui .status-processing .status-dot {
+                    background: #f59e0b;
+                    animation: pulse-processing 1s infinite;
+                }
+
+                #chatgpt-automation-ui .status-waiting .status-dot {
+                    background: #3b82f6;
+                    animation: pulse-processing 1.5s infinite;
+                }
+
+                #chatgpt-automation-ui .status-complete .status-dot {
+                    background: #10b981;
+                    animation: none;
+                }
+
+                #chatgpt-automation-ui .status-error .status-dot {
+                    background: #ef4444;
+                    animation: pulse-processing 0.5s infinite;
+                }
+            `;
             document.head.appendChild(style);
         }
         document.body.appendChild(mainContainer);
@@ -1625,12 +1505,7 @@
 
         // Restore saved inputs, toggles and config
         try {
-            // Chain JSON
-            const savedChain = GM_getValue(STORAGE_KEYS.chainDef, '');
-            if (savedChain) {
-                const chainInput = document.getElementById('chain-json-input');
-                if (chainInput) chainInput.value = savedChain;
-            }
+            // Chain JSON restored later with parsing
 
             // Checkboxes and switches
             const loopEl = document.getElementById('loop-checkbox');
@@ -1683,27 +1558,6 @@
             const toEl = document.getElementById('response-timeout-input');
             if (toEl) toEl.value = String(CONFIG.RESPONSE_TIMEOUT);
 
-            const minW = parseInt(GM_getValue(STORAGE_KEYS.configMinWidth, CONFIG.MIN_WIDTH));
-            const minH = parseInt(GM_getValue(STORAGE_KEYS.configMinHeight, CONFIG.MIN_HEIGHT));
-            const maxW = parseInt(GM_getValue(STORAGE_KEYS.configMaxWidth, CONFIG.MAX_WIDTH));
-            const maxH = parseInt(GM_getValue(STORAGE_KEYS.configMaxHeight, CONFIG.MAX_HEIGHT));
-            if (!Number.isNaN(minW)) CONFIG.MIN_WIDTH = minW;
-            if (!Number.isNaN(minH)) CONFIG.MIN_HEIGHT = minH;
-            if (!Number.isNaN(maxW)) CONFIG.MAX_WIDTH = maxW;
-            if (!Number.isNaN(maxH)) CONFIG.MAX_HEIGHT = maxH;
-            const minWEl = document.getElementById('min-width-input');
-            const minHEl = document.getElementById('min-height-input');
-            const maxWEl = document.getElementById('max-width-input');
-            const maxHEl = document.getElementById('max-height-input');
-            if (minWEl) minWEl.value = String(CONFIG.MIN_WIDTH);
-            if (minHEl) minHEl.value = String(CONFIG.MIN_HEIGHT);
-            if (maxWEl) maxWEl.value = String(CONFIG.MAX_WIDTH);
-            if (maxHEl) maxHEl.value = String(CONFIG.MAX_HEIGHT);
-            // Override CSS min/max with inline styles so changes take effect immediately
-            mainContainer.style.minWidth = CONFIG.MIN_WIDTH + 'px';
-            mainContainer.style.minHeight = CONFIG.MIN_HEIGHT + 'px';
-            mainContainer.style.maxWidth = CONFIG.MAX_WIDTH + 'px';
-            mainContainer.style.maxHeight = CONFIG.MAX_HEIGHT + 'px';
 
             const defVis = !!GM_getValue(STORAGE_KEYS.configDefaultVisible, CONFIG.DEFAULT_VISIBLE);
             CONFIG.DEFAULT_VISIBLE = defVis;
@@ -1711,30 +1565,22 @@
             if (dvEl) dvEl.checked = defVis;
 
             // Chain definition
-            try {
-                const savedChain = GM_getValue(STORAGE_KEYS.chainDef, '');
-                const chainInput = document.getElementById('chain-json-input');
-                if (savedChain && chainInput) {
-                    chainInput.value = typeof savedChain === 'string' ? savedChain : JSON.stringify(savedChain, null, 2);
-                    chainDefinition = JSON.parse(chainInput.value);
-                }
-            } catch { /* ignore */ }
+            const savedChain = GM_getValue(STORAGE_KEYS.chainDef, '');
+            const chainInput = document.getElementById('chain-json-input');
+            if (savedChain && chainInput) {
+                chainInput.value = typeof savedChain === 'string' ? savedChain : JSON.stringify(savedChain, null, 2);
+                try { chainDefinition = JSON.parse(chainInput.value); } catch { chainDefinition = null; }
+            }
         } catch { }
 
         // Load saved state
-    const savedState = loadUIState();
-    if (savedState.left) {
+        const savedState = loadUIState();
+        if (savedState.left) {
             mainContainer.style.left = savedState.left;
             mainContainer.style.right = 'auto';
         }
         if (savedState.top) {
             mainContainer.style.top = savedState.top;
-        }
-        if (savedState.width) {
-            mainContainer.style.width = savedState.width;
-        }
-        if (savedState.height) {
-            mainContainer.style.height = savedState.height;
         }
         if (savedState.minimized) {
             isMinimized = true;
@@ -1796,9 +1642,6 @@
         mountHeaderLauncher();
         startHeaderObserver();
         log('UI initialized successfully');
-
-        // Auto-resize container to fit initial content
-        setTimeout(() => autoResizeContainer(), 200);
     };
 
     // Header launcher utilities
@@ -1838,7 +1681,7 @@
         }
         // Also ensure the UI exists if it should be visible
         const savedState = loadUIState();
-    const shouldShow = savedState.visible === true || (savedState.visible == null && CONFIG.DEFAULT_VISIBLE);
+        const shouldShow = savedState.visible === true || (savedState.visible == null && CONFIG.DEFAULT_VISIBLE);
         if (shouldShow && !document.getElementById('chatgpt-automation-ui')) {
             createUI();
         }
@@ -1883,66 +1726,6 @@
         statusIndicator.querySelector('.status-text').textContent = statusTexts[status] || 'Unknown';
     };
 
-    // Auto-resize container to fit content
-    const autoResizeContainer = () => {
-        if (!mainContainer || isMinimized) return;
-
-        // declare here so catch block can restore on error
-        let originalHeight = null;
-        let originalMaxHeight = null;
-
-        try {
-            // Get the automation content container
-            const contentContainer = document.querySelector('#automation-content');
-            if (!contentContainer) return;
-
-            // Temporarily remove height constraints to measure natural height
-            originalHeight = mainContainer.style.height;
-            originalMaxHeight = mainContainer.style.maxHeight;
-
-            mainContainer.style.height = 'auto';
-            mainContainer.style.maxHeight = 'none';
-
-            // Force layout recalculation
-            contentContainer.style.height = 'auto';
-
-            // Wait for next frame to get accurate measurements
-            requestAnimationFrame(() => {
-                const contentHeight = contentContainer.scrollHeight;
-                const headerHeight = 60; // Header height
-                const logHeaderHeight = 45; // Log header when visible
-                const padding = 20; // Some padding
-
-                let targetHeight = contentHeight + headerHeight + padding;
-
-                // Add log header height if log is visible
-                const logContainer = document.getElementById('log-container');
-                if (logContainer) {
-                    targetHeight += logHeaderHeight;
-                }
-
-                // Apply min/max constraints
-                targetHeight = Math.max(targetHeight, CONFIG.MIN_HEIGHT);
-                targetHeight = Math.min(targetHeight, CONFIG.MAX_HEIGHT);
-
-                // Apply the calculated height
-                mainContainer.style.height = `${targetHeight}px`;
-                mainContainer.style.maxHeight = `${CONFIG.MAX_HEIGHT}px`;
-
-                // Reset content container height
-                contentContainer.style.height = '';
-
-                log(`Container auto-resized to ${targetHeight}px`);
-            });
-
-        } catch (error) {
-            // Restore original height on error
-            if (originalHeight) mainContainer.style.height = originalHeight;
-            if (originalMaxHeight) mainContainer.style.maxHeight = originalMaxHeight;
-            log(`Auto-resize error: ${error.message}`, 'warning');
-        }
-    };
-
     const bindEvents = () => {
         // Tab switching
         document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -1956,9 +1739,6 @@
                 // Update active tab content
                 document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
                 document.getElementById(`${tabName}-tab`).classList.add('active');
-
-                // Auto-resize container to fit new content
-                setTimeout(() => autoResizeContainer(), 100);
 
                 // Persist active tab
                 saveToStorage(STORAGE_KEYS.activeTab, tabName);
@@ -1998,22 +1778,24 @@
             }
         });
 
-        // Toggle log button (footer)
         const toggleLogVisibility = () => {
             const logWrap = document.getElementById('log-container');
             if (!logWrap) return;
-            const isHidden = logWrap.style.display === 'none';
-            logWrap.style.display = isHidden ? 'flex' : 'none';
-            // Save state
-            saveToStorage('log.visible', isHidden);
-            setTimeout(() => autoResizeContainer(), 50);
+            const currentlyHidden = logWrap.style.display === 'none';
+            const willShow = currentlyHidden;
+            logWrap.style.display = willShow ? 'flex' : 'none';
+            // Toggle class on main container so CSS can adapt minimized height
+            if (mainContainer) {
+                mainContainer.classList.toggle('log-open', willShow);
+            }
+            saveToStorage('log.visible', willShow);
         };
-        // Header icon toggles log
         document.getElementById('header-log-toggle').addEventListener('click', toggleLogVisibility);
 
         // Clear log button
         document.getElementById('clear-log-btn').addEventListener('click', () => {
             logContainer.innerHTML = '';
+            saveToStorage(STORAGE_KEYS.logHistory, []);
             log('Log cleared');
         });
 
@@ -2036,23 +1818,24 @@
             saveToStorage(STORAGE_KEYS.autoScroll, autoScrollLogs);
         });
 
-        // Minimize button toggles compact view without forcing fixed heights
-        let _previousHeight = null;
         document.getElementById('minimize-btn').addEventListener('click', () => {
             isMinimized = !isMinimized;
             if (isMinimized) {
                 // Save previous explicit height if present
-                _previousHeight = mainContainer.style.height || null;
                 mainContainer.classList.add('minimized');
             } else {
                 mainContainer.classList.remove('minimized');
-                // Restore previous height or auto-resize
-                if (_previousHeight) {
-                    mainContainer.style.height = _previousHeight;
-                } else {
-                    mainContainer.style.height = '';
-                    setTimeout(() => autoResizeContainer(), 100);
+
+                mainContainer.style.height = '';
+                // after finishing resize and saving state
+                isResizing = false;
+                // allow CSS/auto layout to reclaim sizing by removing inline size overrides
+                if (mainContainer) {
+                    mainContainer.style.removeProperty('width');
+                    mainContainer.style.removeProperty('height');
                 }
+                saveUIState(true);
+
             }
             saveUIState(true); // Immediate save for user action
         });
@@ -2069,12 +1852,12 @@
 
         // Template tab JS check and snippet - removed since elements no longer exist
 
-    // Keyboard shortcuts
+        // Keyboard shortcuts
         document.addEventListener('keydown', (e) => {
             // Ctrl/Cmd + Enter to send
             if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-        const sendBtn = document.getElementById('send-btn');
-        if (sendBtn) sendBtn.click();
+                const sendBtn = document.getElementById('send-btn');
+                if (sendBtn) sendBtn.click();
                 e.preventDefault();
             }
 
@@ -2126,8 +1909,11 @@
 
                 saveUIState(); // Debounced for drag operations
             } else if (isResizing) {
-                const newWidth = Math.max(CONFIG.MIN_WIDTH, Math.min(CONFIG.MAX_WIDTH, resizeStartWidth + (e.clientX - resizeStartX)));
-                const newHeight = Math.max(CONFIG.MIN_HEIGHT, Math.min(CONFIG.MAX_HEIGHT, resizeStartHeight + (e.clientY - resizeStartY)));
+                // Clamp resizing to reasonable window bounds (sizes are automatic)
+                const rawWidth = resizeStartWidth + (e.clientX - resizeStartX);
+                const rawHeight = resizeStartHeight + (e.clientY - resizeStartY);
+                const newWidth = Math.max(200, Math.min(window.innerWidth, rawWidth));
+                const newHeight = Math.max(120, Math.min(window.innerHeight, rawHeight));
 
                 mainContainer.style.width = `${newWidth}px`;
                 mainContainer.style.height = `${newHeight}px`;
@@ -2181,37 +1967,6 @@
             });
         }
 
-        // Settings: Size bounds (consolidated)
-        const applySizeLimits = () => {
-            mainContainer.style.minWidth = CONFIG.MIN_WIDTH + 'px';
-            mainContainer.style.minHeight = CONFIG.MIN_HEIGHT + 'px';
-            mainContainer.style.maxWidth = CONFIG.MAX_WIDTH + 'px';
-            mainContainer.style.maxHeight = CONFIG.MAX_HEIGHT + 'px';
-        };
-
-        // Data-driven size input handlers
-        const sizeInputs = [
-            { id: 'min-width-input', configKey: 'MIN_WIDTH', storageKey: STORAGE_KEYS.configMinWidth, min: 200, max: 1200 },
-            { id: 'min-height-input', configKey: 'MIN_HEIGHT', storageKey: STORAGE_KEYS.configMinHeight, min: 120, max: 1200 },
-            { id: 'max-width-input', configKey: 'MAX_WIDTH', storageKey: STORAGE_KEYS.configMaxWidth, min: 200, max: 2000 },
-            { id: 'max-height-input', configKey: 'MAX_HEIGHT', storageKey: STORAGE_KEYS.configMaxHeight, min: 120, max: 2000 }
-        ];
-
-        sizeInputs.forEach(({ id, configKey, storageKey, min, max }) => {
-            const element = document.getElementById(id);
-            if (element) {
-                element.addEventListener('change', (e) => {
-                    const v = parseInt(e.target.value);
-                    if (!Number.isNaN(v) && v >= min && v <= max) {
-                        CONFIG[configKey] = v;
-                        saveToStorage(storageKey, v);
-                        applySizeLimits();
-                    } else {
-                        e.target.value = String(CONFIG[configKey]);
-                    }
-                });
-            }
-        });
 
         // Settings: default visible
         const defVisEl = document.getElementById('default-visible-checkbox');
@@ -2226,7 +1981,12 @@
         try {
             const logWrap = document.getElementById('log-container');
             const vis = GM_getValue('log.visible', true);
-            if (logWrap) logWrap.style.display = vis ? 'flex' : 'none';
+            if (logWrap) {
+                logWrap.style.display = vis ? 'flex' : 'none';
+            }
+            if (mainContainer) {
+                mainContainer.classList.toggle('log-open', !!vis);
+            }
         } catch { }
 
         // Chain UI: basic actions
@@ -2259,13 +2019,13 @@
                             step.type === 'http' ? 'HTTP Request' : step.type;
 
                 card.innerHTML = `
-                    <div class="title">${step.title || step.id || '(untitled)'}</div>
-                    <div class="meta">type: ${typeDisplay}${step.next ? ` → ${step.next}` : ''}</div>
-                    <div class="actions">
-                        <button class="btn btn-secondary btn-sm" data-action="edit" title="Edit step">✏️</button>
-                        <button class="btn btn-danger btn-sm" data-action="delete" title="Delete step">🗑️</button>
-                    </div>
-                `;
+                        <div class="title">${step.title || step.id || '(untitled)'}</div>
+                        <div class="meta">type: ${typeDisplay}${step.next ? ` → ${step.next}` : ''}</div>
+                        <div class="actions">
+                            <button class="btn btn-secondary btn-sm" data-action="edit" title="Edit step">✏️</button>
+                            <button class="btn btn-danger btn-sm" data-action="delete" title="Delete step">🗑️</button>
+                        </div>
+                    `;
 
                 card.querySelector('[data-action="edit"]').addEventListener('click', () => openStepEditor(step.id));
                 card.querySelector('[data-action="delete"]').addEventListener('click', () => {
@@ -2637,20 +2397,26 @@
 
             let chainsMap = GM_getValue(STORAGE_KEYS.presetsChains, {});
             const defaultChains = {
-                'Weather Analysis': JSON.stringify({ entryId: 'weather', steps: [
-                    { id: 'weather', type: 'http', url: 'https://api.openweathermap.org/data/2.5/weather?q={item}&appid=YOUR_API_KEY', method: 'GET', next: 'extract' },
-                    { id: 'extract', type: 'js', code: 'const data = JSON.parse(steps.weather.data);\nreturn data.main.temp;', next: 'chat' },
-                    { id: 'chat', type: 'prompt', template: 'The temperature is {steps.extract.response}°K. What activities would you recommend for this weather?' }
-                ]}, null, 2),
-                'Content Research': JSON.stringify({ entryId: 'search', steps: [
-                    { id: 'search', type: 'prompt', template: 'Research {item} and provide 3 key facts', next: 'summarize' },
-                    { id: 'summarize', type: 'js', code: 'log("Research complete for: " + item);\nreturn steps.search.response.substring(0, 200) + "...";', next: 'expand' },
-                    { id: 'expand', type: 'prompt', template: 'Based on this summary: {steps.summarize.response}, write a detailed article about {item}' }
-                ]}, null, 2),
-                'Simple Chain': JSON.stringify({ entryId: 'step1', steps: [
-                    { id: 'step1', type: 'prompt', template: 'Tell me about {item}', next: 'step2' },
-                    { id: 'step2', type: 'template', template: 'Summary: {steps.step1.response}' }
-                ]}, null, 2)
+                'Weather Analysis': JSON.stringify({
+                    entryId: 'weather', steps: [
+                        { id: 'weather', type: 'http', url: 'https://api.openweathermap.org/data/2.5/weather?q={item}&appid=YOUR_API_KEY', method: 'GET', next: 'extract' },
+                        { id: 'extract', type: 'js', code: 'const data = JSON.parse(steps.weather.data);\nreturn data.main.temp;', next: 'chat' },
+                        { id: 'chat', type: 'prompt', template: 'The temperature is {steps.extract.response}°K. What activities would you recommend for this weather?' }
+                    ]
+                }, null, 2),
+                'Content Research': JSON.stringify({
+                    entryId: 'search', steps: [
+                        { id: 'search', type: 'prompt', template: 'Research {item} and provide 3 key facts', next: 'summarize' },
+                        { id: 'summarize', type: 'js', code: 'log("Research complete for: " + item);\nreturn steps.search.response.substring(0, 200) + "...";', next: 'expand' },
+                        { id: 'expand', type: 'prompt', template: 'Based on this summary: {steps.summarize.response}, write a detailed article about {item}' }
+                    ]
+                }, null, 2),
+                'Simple Chain': JSON.stringify({
+                    entryId: 'step1', steps: [
+                        { id: 'step1', type: 'prompt', template: 'Tell me about {item}', next: 'step2' },
+                        { id: 'step2', type: 'template', template: 'Summary: {steps.step1.response}' }
+                    ]
+                }, null, 2)
             };
 
             // Merge defaults with existing, preserving user presets
@@ -2659,7 +2425,7 @@
                     chainsMap[name] = preset;
                 }
             });
-            GM_setValue(STORAGE_KEYS.presetsChains, chainsMap);            const fill = (id, map) => {
+            GM_setValue(STORAGE_KEYS.presetsChains, chainsMap); const fill = (id, map) => {
                 const sel = document.getElementById(id);
                 if (!sel) return;
                 sel.innerHTML = '<option value="">Select preset...</option>';
@@ -2670,12 +2436,10 @@
                     sel.appendChild(o);
                 });
             };
-            try {
-                // Update composer presets
-                fill('composer-preset-select', chainsMap);
-                // Update step modal presets (from new steps store)
-                fill('step-preset-select', stepsMap);
-            } catch { }
+            // Update composer presets
+            fill('composer-preset-select', chainsMap);
+            // Update step modal presets (from new steps store)
+            fill('step-preset-select', stepsMap);
         };
 
         const getComposerPresetName = () => (document.getElementById('composer-preset-name-input')?.value || '').trim();
@@ -2847,14 +2611,23 @@
             // heartbeat
             clearInterval(runLockTimer);
             runLockTimer = setInterval(() => {
-                try { localStorage.setItem(key, JSON.stringify({ id: selfId, ts: Date.now() })); } catch { }
+                try { localStorage.setItem(key, JSON.stringify({ id: selfId, ts: Date.now() })); } catch (e) { /* ignore */ }
             }, CONFIG.RUN_LOCK_RENEW_MS);
             window.addEventListener('beforeunload', releaseRunLock);
             return true;
         } catch { return true; }
     };
     const releaseRunLock = () => {
-        try { clearInterval(runLockTimer); runLockTimer = null; const key = STORAGE_KEYS.runLockKey; const existing = localStorage.getItem(key); if (existing) { const obj = JSON.parse(existing); if (!obj || obj.id === runLockId) localStorage.removeItem(key); } } catch { }
+        try {
+            clearInterval(runLockTimer);
+            runLockTimer = null;
+            const key = STORAGE_KEYS.runLockKey;
+            const existing = localStorage.getItem(key);
+            if (existing) {
+                const obj = JSON.parse(existing);
+                if (!obj || obj.id === runLockId) localStorage.removeItem(key);
+            }
+        } catch (e) { /* ignore */ }
     };
 
     const runChainWithBatch = async () => {
@@ -2919,7 +2692,6 @@
                 total: context.total,
                 // Add easy access to previous steps via steps.stepId pattern
                 steps: context.steps,
-                // Legacy compatibility
                 chain: context.chain
             };
 
@@ -2949,7 +2721,7 @@
                 const url = processDynamicTemplate(step.url || '', stepContext);
                 const method = (step.method || 'GET').toUpperCase();
                 let headers = step.headers || {};
-                try { if (typeof headers === 'string') headers = JSON.parse(headers); } catch { }
+                try { if (typeof headers === 'string') headers = JSON.parse(headers); } catch (e) { /* leave headers as-is if parse fails */ }
                 const body = step.bodyTemplate ? processDynamicTemplate(step.bodyTemplate, stepContext) : undefined;
 
                 const res = await http.request({ method, url, headers, data: body });
