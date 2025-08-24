@@ -1,4 +1,3 @@
-
 // ==UserScript==
 // @name         ChatGPT Automation Pro
 // @namespace    http://tampermonkey.net/
@@ -107,7 +106,7 @@
             console.log(logMessage);
         }
 
-    if (logContainer) {
+        if (logContainer) {
             const logEntry = document.createElement('div');
             logEntry.className = `log-entry log-${type}`;
             logEntry.textContent = logMessage;
@@ -771,34 +770,6 @@
                             </label>
                             <div class="help-text">Controls default visibility on page load. You can still toggle from the header button.</div>
                         </div>
-                        <div class="form-group">
-                            <label>Presets:</label>
-                            <div class="presets-grid">
-                                <div class="preset-block">
-                                    <div class="preset-row">
-                                        <input type="text" id="preset-name-input" class="settings-input" placeholder="Preset name">
-                                    </div>
-                                    <div class="preset-row">
-                                        <button class="btn btn-secondary" id="save-template-preset-btn">Save Template</button>
-                                        <select id="load-template-select" class="settings-input"></select>
-                                        <button class="btn btn-primary" id="load-template-preset-btn">Load</button>
-                                        <button class="btn btn-danger" id="delete-template-preset-btn">Delete</button>
-                                    </div>
-                                    <div class="preset-row">
-                                        <button class="btn btn-secondary" id="save-chain-preset-btn">Save Chain</button>
-                                        <select id="load-chain-select" class="settings-input"></select>
-                                        <button class="btn btn-primary" id="load-chain-preset-btn">Load</button>
-                                        <button class="btn btn-danger" id="delete-chain-preset-btn">Delete</button>
-                                    </div>
-                                    <div class="preset-row">
-                                        <button class="btn btn-secondary" id="save-js-preset-btn">Save Response JS</button>
-                                        <select id="load-js-select" class="settings-input"></select>
-                                        <button class="btn btn-primary" id="load-js-preset-btn">Load</button>
-                                        <button class="btn btn-danger" id="delete-js-preset-btn">Delete</button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
                     </div>
 
                 </div>
@@ -833,7 +804,7 @@
                         <button class="header-btn" id="close-step-modal-btn" aria-label="Close">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
                             <path d="M18.3 5.71L12 12.01L5.7 5.71L4.29 7.12L10.59 13.42L4.29 19.72L5.7 21.13L12 14.83L18.3 21.13L19.71 19.72L13.41 13.42L19.71 7.12L18.3 5.71Z"/>
-                        </svg>  
+                        </svg>
                         </button>
                     </div>
                     <div class="chain-modal-body">
@@ -939,6 +910,7 @@
                 display: flex;
                 flex-direction: column;
                 min-height: 0;
+                height: calc(100% - 60px); /* Account for header height */
             }
             #chatgpt-automation-ui.minimized .progress-container,
             #chatgpt-automation-ui.minimized .automation-form {
@@ -950,17 +922,20 @@
                 /* occupy the available area while minimized */
                 flex: 1 1 auto;
                 min-height: 0;
+                height: 100%;
             }
             #chatgpt-automation-ui.minimized #log-container {
                 flex: 1 1 auto;
                 min-height: 0;
                 overflow: hidden;
+                height: 100%;
             }
             #chatgpt-automation-ui.minimized .log-content {
                 /* Let logs fill available space and scroll internally */
                 flex: 1 1 auto;
                 min-height: 0;
                 overflow-y: auto;
+                height: calc(100% - 50px); /* Account for log header */
             }
             #chatgpt-automation-ui.minimized .automation-header {
                 position: sticky;
@@ -1453,6 +1428,9 @@
                 scroll-behavior: smooth;
                 flex: 1 1 auto;
                 min-height: 0;
+                /* Ensure the content area reserves space under the log header and scrolls correctly */
+                height: calc(100% - 50px);
+                box-sizing: border-box;
             }
 
             #chatgpt-automation-ui #step-next-select {
@@ -1641,11 +1619,11 @@
 
         // Get UI elements
         statusIndicator = document.getElementById('status-indicator');
-    logContainer = document.querySelector('.log-content');
+        logContainer = document.querySelector('.log-content');
         progressBar = document.getElementById('progress-container');
         resizeHandle = document.getElementById('resize-handle');
 
-    // Restore saved inputs, toggles and config
+        // Restore saved inputs, toggles and config
         try {
             // Chain JSON
             const savedChain = GM_getValue(STORAGE_KEYS.chainDef, '');
@@ -1784,20 +1762,6 @@
             }
         } catch { }
 
-        // Restore persisted log history
-        try {
-            const hist = GM_getValue(STORAGE_KEYS.logHistory, []);
-            if (Array.isArray(hist) && hist.length && logContainer) {
-                hist.slice(-200).forEach(h => {
-                    const div = document.createElement('div');
-                    div.className = `log-entry log-${h.type||'info'}`;
-                    div.textContent = h.msg;
-                    logContainer.appendChild(div);
-                });
-                logContainer.scrollTop = logContainer.scrollHeight;
-            }
-        } catch {}
-
         // Bind events
         bindEvents();
 
@@ -1833,7 +1797,7 @@
         startHeaderObserver();
         log('UI initialized successfully');
 
-    // Auto-resize container to fit initial content
+        // Auto-resize container to fit initial content
         setTimeout(() => autoResizeContainer(), 200);
     };
 
@@ -1980,7 +1944,7 @@
     };
 
     const bindEvents = () => {
-    // Tab switching
+        // Tab switching
         document.querySelectorAll('.tab-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 const tabName = btn.dataset.tab;
@@ -2272,7 +2236,14 @@
             if (!chainCards) return;
             chainCards.innerHTML = '';
             let chain;
-            try { chain = JSON.parse(chainInput.value || '{}'); } catch { chain = null; }
+            try {
+                chain = JSON.parse(chainInput.value || '{}');
+                // Update global chainDefinition when parsing JSON
+                chainDefinition = chain;
+            } catch {
+                chain = null;
+                chainDefinition = null;
+            }
             if (!chain || !Array.isArray(chain.steps) || chain.steps.length === 0) {
                 // Chain cards will show empty state due to CSS :empty selector
                 return;
@@ -2329,6 +2300,7 @@
             const modal = document.getElementById('chain-step-modal');
             modal.style.display = 'block';
             modal.setAttribute('aria-hidden', 'false');
+
             // Populate fields
             document.getElementById('step-id-input').value = step.id || '';
             document.getElementById('step-title-input').value = step.title || '';
@@ -2533,7 +2505,7 @@
             let chain;
             try { chain = JSON.parse(chainInput.value || '{}'); } catch { chain = {}; }
             if (!chain.steps) chain.steps = [];
-            
+
             const id = `step-${(chain.steps.length || 0) + 1}`;
             const newStep = {
                 id,
@@ -2541,7 +2513,7 @@
                 type: 'prompt',
                 template: ''
             };
-            
+
             // Auto-link the previous step if it doesn't have a next
             if (chain.steps.length > 0) {
                 const lastStep = chain.steps[chain.steps.length - 1];
@@ -2549,13 +2521,13 @@
                     lastStep.next = id;
                 }
             }
-            
+
             chain.steps.push(newStep);
             if (!chain.entryId) chain.entryId = id;
             chainInput.value = JSON.stringify(chain, null, 2);
             saveToStorage(STORAGE_KEYS.chainDef, chainInput.value);
             refreshChainCards();
-            
+
             // Open editor and default to "Select preset"
             openStepEditor(id);
             // Reset the preset selector to show "Select preset..."
@@ -2653,7 +2625,7 @@
                     code: '// Process API response\nconst data = JSON.parse(steps.apiCall.data);\nlog("Post title:", data.title);\nreturn data.title;'
                 }
             };
-            
+
             // Merge defaults with existing, preserving user presets
             Object.entries(defaultSteps).forEach(([name, preset]) => {
                 if (!stepsMap[name]) {
@@ -2662,7 +2634,7 @@
             });
             GM_setValue(STORAGE_KEYS.presetsSteps, stepsMap);
 
-            
+
             let chainsMap = GM_getValue(STORAGE_KEYS.presetsChains, {});
             const defaultChains = {
                 'Weather Analysis': JSON.stringify({ entryId: 'weather', steps: [
@@ -2680,7 +2652,7 @@
                     { id: 'step2', type: 'template', template: 'Summary: {steps.step1.response}' }
                 ]}, null, 2)
             };
-            
+
             // Merge defaults with existing, preserving user presets
             Object.entries(defaultChains).forEach(([name, preset]) => {
                 if (!chainsMap[name]) {
@@ -2841,7 +2813,7 @@
                 log('Select a preset to delete', 'warning');
                 return;
             }
-            
+
             if (confirm(`Delete preset "${select.value}"?`)) {
                 try {
                     const map = GM_getValue(STORAGE_KEYS.presetsSteps, {}) || {};
