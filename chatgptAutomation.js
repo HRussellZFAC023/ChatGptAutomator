@@ -97,7 +97,10 @@
 
   const utils = {
     log: (message, type = 'info') => {
-      const timestamp = new Date().toLocaleTimeString();
+      const now = new Date();
+      const datePart = now.toLocaleDateString(undefined, { day: '2-digit', month: 'short' });
+      const timePart = now.toLocaleTimeString();
+      const timestamp = `${datePart} ${timePart}`;
       const logMessage = `[${timestamp}] ${message}`;
 
       if (CONFIG.DEBUG_MODE) console.log(logMessage);
@@ -2717,9 +2720,61 @@
 
       // Template fields
       document.getElementById('step-template-input').value = step.template || '';
-      document.getElementById('step-template-elements').value = step.elements || '';
+      const stepElementsEl = document.getElementById('step-template-elements');
+      stepElementsEl.value = step.elements || '';
       const useSamplesCb = document.getElementById('step-use-dynamicelements-checkbox');
-      if (useSamplesCb) useSamplesCb.checked = !!step.useDynamicElements;
+      // Override-but-restore: when checked, populate the step elements from chain.dynamicElements
+      // and disable editing; when unchecked, restore the previous per-step value.
+      if (useSamplesCb) {
+        useSamplesCb.checked = !!step.useDynamicElements;
+        // Replace any existing handler to avoid duplicates
+        useSamplesCb.onchange = (e) => {
+          try {
+            if (e.target.checked) {
+              // Backup current step value so it can be restored later
+              try {
+                modal.dataset.backupStepElements = stepElementsEl.value || '';
+              } catch {}
+              // Populate from chain.dynamicElements (prefer chain parsed from editor)
+              try {
+                if (
+                  chain &&
+                  (Array.isArray(chain.dynamicElements) ||
+                    typeof chain.dynamicElements === 'string')
+                ) {
+                  try {
+                    stepElementsEl.value = JSON.stringify(chain.dynamicElements, null, 2);
+                  } catch {
+                    stepElementsEl.value = String(chain.dynamicElements);
+                  }
+                } else {
+                  stepElementsEl.value = '';
+                }
+              } catch {}
+              stepElementsEl.disabled = true;
+            } else {
+              // Restore backed-up value (if any) and re-enable editing
+              try {
+                const bak = modal.dataset.backupStepElements;
+                stepElementsEl.value = bak != null ? bak : step.elements || '';
+                delete modal.dataset.backupStepElements;
+              } catch {
+                stepElementsEl.value = step.elements || '';
+              }
+              stepElementsEl.disabled = false;
+            }
+          } catch (err) {
+            utils.log('Failed to toggle useDynamicElements: ' + err.message, 'error');
+          }
+        };
+        // Initialize UI state according to the checkbox
+        if (useSamplesCb.checked) {
+          // Trigger handler to populate from chain
+          useSamplesCb.dispatchEvent(new Event('change'));
+        } else {
+          stepElementsEl.disabled = false;
+        }
+      }
 
       // Prompt
       document.getElementById('step-prompt-template').value = step.template || '';
@@ -3481,9 +3536,14 @@
       try {
         const sel = document.getElementById(selId);
         if (!sel || !sel.value) return utils.log('Select a preset to delete', 'warning');
+        const name = sel.value;
+        // Confirm with the user before deleting the selected preset/chain
+        if (!confirm(`Delete preset/chain "${name}"? This action cannot be undone.`)) {
+          utils.log(`Delete cancelled for "${name}"`, 'info');
+          return;
+        }
         const raw = GM_getValue(storeKey, {}) || {};
         const map = typeof raw === 'string' ? JSON.parse(raw) : raw;
-        const name = sel.value;
         delete map[name];
         GM_setValue(storeKey, map);
         loadPresetSelects();
