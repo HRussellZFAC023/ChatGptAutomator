@@ -587,371 +587,53 @@
     ui.mainContainer.id = 'chatgpt-automation-ui';
     ui.mainContainer.className = state.isDarkMode ? 'dark-mode' : 'light-mode';
     ui.mainContainer.innerHTML = /*html*/ `<div class="automation-header" id="automation-header">
-  <h3>ChatGPT Automation Pro</h3>
-  <div class="header-controls">
-    <div
-      class="mini-progress"
-      id="mini-progress"
-      style="display: none"
-      title="Batch progress"
-    >
-      <div class="mini-bar"><div class="mini-fill" id="mini-fill"></div></div>
-      <div class="mini-label" id="mini-label">0/0</div>
-    </div>
-    <div
-      class="mini-progress"
-      id="mini-sub-progress"
-      style="display: none"
-      title="Inner batch progress"
-    >
-      <div class="mini-bar">
-        <div class="mini-fill" id="mini-sub-fill"></div>
+    <h3>ChatGPT Automation Pro</h3>
+    <div class="header-controls">
+      <div
+        class="mini-progress"
+        id="mini-progress"
+        style="display: none"
+        title="Batch progress"
+      >
+        <div class="mini-bar"><div class="mini-fill" id="mini-fill"></div></div>
+        <div class="mini-label" id="mini-label">0/0</div>
       </div>
-      <div class="mini-label" id="mini-sub-label">0/0</div>
-    </div>
-    <div class="status-indicator" id="status-indicator">
-      <span class="status-dot"></span>
-      <span class="status-text">Ready</span>
-    </div>
-    <button
-      class="header-btn"
-      id="header-log-toggle"
-      title="Show/Hide Log"
-      aria-label="Show/Hide Log"
-    >
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M4 5h16v2H4V5zm0 6h16v2H4v-2zm0 6h10v2H4v-2z" />
-      </svg>
-    </button>
-    <button
-      class="header-btn"
-      id="minimize-btn"
-      title="Minimize"
-      aria-label="Minimize"
-    >
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M6 12h12v2H6z" />
-      </svg>
-    </button>
-    <button class="header-btn" id="close-btn" title="Close" aria-label="Close">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-        <path
-          d="M18.3 5.71L12 12.01L5.7 5.71L4.29 7.12L10.59 13.42L4.29 19.72L5.7 21.13L12 14.83L18.3 21.13L19.71 19.72L13.41 13.42L19.71 7.12L18.3 5.71Z"
-        />
-      </svg>
-    </button>
-  </div>
-</div>
-
-<div class="automation-content" id="automation-content">
-  <div class="progress-container" id="progress-container" style="display: none">
-    <div class="progress-bar">
-      <div class="progress-fill"></div>
-    </div>
-    <div class="progress-text">0/0</div>
-    <div
-      class="progress-bar sub"
-      id="progress-container-sub"
-      style="display: none; margin-top: 6px"
-    >
-      <div class="progress-fill"></div>
-    </div>
-    <div class="progress-text sub" id="progress-text-sub" style="display: none">
-      0/0
-    </div>
-  </div>
-
-  <div class="automation-form">
-    <div class="tab-container">
-      <button class="tab-btn active" data-tab="composer">Composer</button>
-      <button class="tab-btn" data-tab="settings">Settings</button>
-    </div>
-
-    <div class="tab-content active" id="composer-tab">
-      <div class="form-group">
-        <label>Composer Canvas:</label>
-        <div class="composer-presets">
-          <div class="preset-row">
-            <input
-              type="text"
-              id="composer-preset-name-input"
-              class="settings-input"
-              placeholder="Preset name"
-              style="flex: 1"
-            />
-            <select
-              id="composer-preset-select"
-              class="settings-input"
-              style="flex: 2"
-            >
-              <option value="">Select preset...</option>
-            </select>
-            <button
-              class="btn btn-secondary"
-              id="save-composer-preset-btn"
-              title="Save current configuration"
-            >
-              💾
-            </button>
-            <button
-              class="btn btn-primary"
-              id="load-composer-preset-btn"
-              title="Load selected preset"
-            >
-              📂
-            </button>
-            <button
-              class="btn btn-danger"
-              id="delete-composer-preset-btn"
-              title="Delete selected preset"
-            >
-              🗑️
-            </button>
-          </div>
+      <div
+        class="mini-progress"
+        id="mini-sub-progress"
+        style="display: none"
+        title="Inner batch progress"
+      >
+        <div class="mini-bar">
+          <div class="mini-fill" id="mini-sub-fill"></div>
         </div>
-        <div id="chain-canvas" class="chain-canvas">
-          <div class="chain-toolbar">
-            <button class="btn btn-secondary" id="add-step-btn">
-              Add Step
-            </button>
-            <button class="btn btn-secondary" id="validate-chain-btn">
-              Validate Chain
-            </button>
-            <button class="btn btn-primary" id="run-chain-btn">
-              Run Chain
-            </button>
-            <button
-              class="btn btn-danger"
-              id="stop-run-btn"
-              style="display: none"
-            >
-              Stop
-            </button>
-          </div>
-          <div id="chain-cards" class="chain-cards"></div>
-        </div>
-        <div class="help-text">
-          Visual editor for multi-step automation chains. Steps connect in
-          sequence; supports templates and custom JavaScript execution.
-        </div>
+        <div class="mini-label" id="mini-sub-label">0/0</div>
       </div>
-      <div class="form-group">
-        <label for="dynamic-elements-input"
-          >Dynamic Elements (List, JSON, or function)</label
-        >
-        <div class="code-editor">
-          <div class="overlay-field">
-            <textarea
-              id="dynamic-elements-input"
-              rows="4"
-              placeholder='["item1", "item2", "item3"] or () => ["generated", "items"]'
-            ></textarea>
-            <button
-              class="tool-btn overlay"
-              id="format-dyn-elements-btn"
-              title="Format JSON"
-            >
-              { }
-            </button>
-            <button
-              class="tool-btn overlay"
-              id="apply-dyn-elements-btn"
-              style="right: 36px;"
-              title="Apply dynamic elements to runtime"
-            >
-              ▶
-            </button>
-          </div>
-        </div>
+      <div class="status-indicator" id="status-indicator">
+        <span class="status-dot"></span>
+        <span class="status-text">Ready</span>
       </div>
-      <div class="form-group">
-        <label for="chain-json-input">Chain JSON (advanced):</label>
-        <div class="code-editor">
-          <textarea
-            id="chain-json-input"
-            rows="6"
-            placeholder='{
-    "entryId": "step-1",
-    "steps": [
-        {
-        "id": "step-1",
-        "type": "prompt",
-        "title": "Create message",
-        "template": "Hello {item}",
-        "next": "step-2"
-        },
-        {
-        "id": "step-2",
-        "type": "js",
-        "title": "Process response",
-        "code": "utils.log(\"Processing: \" + steps[\"step-1\"].response);"
-        }
-    ]
-    }'
-          ></textarea>
-          <div class="editor-tools">
-            <button
-              class="tool-btn"
-              id="format-chain-json-btn"
-              title="Format JSON"
-            >
-              { }
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="tab-content" id="settings-tab">
-      <div class="form-group">
-        <label>Debug mode:</label>
-        <label class="checkbox-label">
-          <input type="checkbox" id="debug-mode-checkbox" />
-          <span class="checkmark"></span>
-          Enable debug logging
-        </label>
-      </div>
-      <div class="form-group">
-        <label>Batch settings:</label>
-        <div class="batch-controls">
-          <div class="batch-settings">
-            <label class="checkbox-label">
-              <input type="checkbox" id="loop-checkbox" />
-              <span class="checkmark"></span>
-              Process all items in batch
-            </label>
-            <label class="checkbox-label">
-              <input type="checkbox" id="auto-remove-checkbox" checked />
-              <span class="checkmark"></span>
-              Remove processed items from queue
-            </label>
-            <div class="wait-time-control">
-              <label for="wait-time-input">Wait between items (ms):</label>
-              <input
-                type="number"
-                id="wait-time-input"
-                min="100"
-                max="30000"
-                value="2000"
-                step="100"
-              />
-            </div>
-            <div class="wait-time-control">
-              <label for="step-wait-input">Wait between steps (ms):</label>
-              <input
-                type="number"
-                id="step-wait-input"
-                min="0"
-                max="30000"
-                value="0"
-                step="100"
-              />
-            </div>
-          </div>
-          <div class="batch-actions">
-            <button
-              id="stop-batch-btn"
-              class="btn btn-danger"
-              style="display: none"
-            >
-              Stop Batch
-            </button>
-          </div>
-        </div>
-      </div>
-      <div class="form-group">
-        <label for="response-timeout-input">Response timeout (ms):</label>
-        <input
-          type="number"
-          id="response-timeout-input"
-          min="10000"
-          max="6000000"
-          step="1000"
-          class="settings-input timeout"
-        />
-      </div>
-      <div class="form-group">
-        <label>Panel size limits (px):</label>
-        <div class="size-inputs-grid"></div>
-      </div>
-      <div class="form-group">
-        <label>Visibility:</label>
-        <label class="checkbox-label">
-          <input type="checkbox" id="default-visible-checkbox" />
-          <span class="checkmark"></span>
-          Show panel by default
-        </label>
-        <div class="help-text">
-          Controls default visibility on page load. You can still toggle from
-          the header button.
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="automation-log" id="log-container">
-    <div class="log-header">
-      <span>Activity Log</span>
-      <div class="log-header-controls">
-        <button class="tool-btn" id="stop-mini-btn" title="Stop" style="display: none">🛑</button>
-        <button
-          class="tool-btn"
-          id="toggle-auto-scroll-btn"
-          title="Toggle Auto-scroll"
-        >
-          📜
-        </button>
-        <button class="tool-btn" id="clear-log-btn" title="Clear Log">
-          🗑️
-        </button>
-      </div>
-    </div>
-    <div class="log-content"></div>
-  </div>
-</div>
-
-<div class="resize-handle" id="resize-handle"></div>
-
-<!-- Modal for editing a chain step -->
-<div
-  id="chain-step-modal"
-  class="chain-modal"
-  aria-hidden="true"
-  style="display: none"
->
-  <div class="chain-modal-backdrop"></div>
-  <div
-    class="chain-modal-dialog"
-    role="dialog"
-    aria-modal="true"
-    aria-labelledby="chain-step-title"
-  >
-    <div class="chain-modal-header">
-      <h4 id="chain-step-title">Edit Step</h4>
-      <div class="step-modal-presets">
-        <select
-          id="step-preset-select"
-          class="settings-input"
-          style="min-width: 120px"
-        >
-          <option value="">Select preset...</option>
-        </select>
-        <button
-          class="tool-btn"
-          id="save-step-preset-btn"
-          title="Save as preset"
-        >
-          💾
-        </button>
-        <button
-          class="tool-btn"
-          id="delete-step-preset-btn"
-          title="Delete preset"
-        >
-          🗑️
-        </button>
-      </div>
-      <button class="header-btn" id="close-step-modal-btn" aria-label="Close">
+      <button
+        class="header-btn"
+        id="header-log-toggle"
+        title="Show/Hide Log"
+        aria-label="Show/Hide Log"
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M4 5h16v2H4V5zm0 6h16v2H4v-2zm0 6h10v2H4v-2z" />
+        </svg>
+      </button>
+      <button
+        class="header-btn"
+        id="minimize-btn"
+        title="Minimize"
+        aria-label="Minimize"
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M6 12h12v2H6z" />
+        </svg>
+      </button>
+      <button class="header-btn" id="close-btn" title="Close" aria-label="Close">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
           <path
             d="M18.3 5.71L12 12.01L5.7 5.71L4.29 7.12L10.59 13.42L4.29 19.72L5.7 21.13L12 14.83L18.3 21.13L19.71 19.72L13.41 13.42L19.71 7.12L18.3 5.71Z"
@@ -959,166 +641,486 @@
         </svg>
       </button>
     </div>
-    <div class="chain-modal-body">
-      <div class="form-group">
-        <label for="step-id-input">ID</label>
-        <input id="step-id-input" class="settings-input" placeholder="step-1" />
+  </div>
+
+  <div class="automation-content" id="automation-content">
+    <div class="progress-container" id="progress-container" style="display: none">
+      <div class="progress-bar">
+        <div class="progress-fill"></div>
       </div>
-      <div class="form-group">
-        <label for="step-title-input">Title</label>
-        <input
-          id="step-title-input"
-          class="settings-input"
-          placeholder="Describe the step"
-        />
+      <div class="progress-text">0/0</div>
+      <div
+        class="progress-bar sub"
+        id="progress-container-sub"
+        style="display: none; margin-top: 6px"
+      >
+        <div class="progress-fill"></div>
       </div>
-      <div class="form-group">
-        <label for="step-type-select">Type</label>
-        <select id="step-type-select" class="settings-input">
-          <option value="prompt">Prompt</option>
-          <option value="template">Template (Batch)</option>
-          <option value="js">JavaScript</option>
-          <option value="http">HTTP Request</option>
-        </select>
+      <div class="progress-text sub" id="progress-text-sub" style="display: none">
+        0/0
       </div>
-      <div class="form-group" data-field="prompt">
-        <label for="step-response-type">Response Type</label>
-        <select id="step-response-type" class="settings-input">
-          <option value="text">Text</option>
-          <option value="image">Image</option>
-        </select>
-        <label class="checkbox-label" style="margin-top: 6px; display: block">
-          <input type="checkbox" id="step-newchat-checkbox" />
-          <span class="checkmark"></span>
-          Open in new chat before this step
-        </label>
+    </div>
+
+    <div class="automation-form">
+      <div class="tab-container">
+        <button class="tab-btn active" data-tab="composer">Composer</button>
+        <button class="tab-btn" data-tab="settings">Settings</button>
       </div>
-      <div class="form-group" data-field="prompt">
-        <label for="step-prompt-template">Message Template</label>
-        <textarea
-          id="step-prompt-template"
-          rows="4"
-          class="settings-input"
-          placeholder="Send a message to ChatGPT. Use {steps.stepId.response} to access previous step data."
-        ></textarea>
-        <div class="help-text">
-          Access previous step data: {steps.stepId.response} for prompts,
-          {steps.stepId.data} for HTTP, {steps.stepId.status} for HTTP status
+
+      <div class="tab-content active" id="composer-tab">
+        <div class="form-group">
+          <label>Composer Canvas:</label>
+          <div class="composer-presets">
+            <div class="preset-row">
+              <input
+                type="text"
+                id="composer-preset-name-input"
+                class="settings-input"
+                placeholder="Preset name"
+                style="flex: 1"
+              />
+              <select
+                id="composer-preset-select"
+                class="settings-input"
+                style="flex: 2"
+              >
+                <option value="">Select preset...</option>
+              </select>
+              <button
+                class="btn btn-secondary"
+                id="save-composer-preset-btn"
+                title="Save current configuration"
+              >
+                <svg width="14" height="14" viewBox="0 0 448 512" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M64 32C28.7 32 0 60.7 0 96L0 416c0 35.3 28.7 64 64 64l320 0c35.3 0 64-28.7 64-64l0-242.7c0-17-6.7-33.3-18.7-45.3L352 50.7C340 38.7 323.7 32 306.7 32L64 32zm32 96c0-17.7 14.3-32 32-32l160 0c17.7 0 32 14.3 32 32l0 64c0 17.7-14.3 32-32 32l-160 0c-17.7 0-32-14.3-32-32l0-64zM224 288a64 64 0 1 1 0 128 64 64 0 1 1 0-128z"/></svg>
+              </button>
+              <button
+                class="btn btn-primary"
+                id="load-composer-preset-btn"
+                title="Load selected preset"
+              >
+                <svg width="14" height="14" viewBox="0 0 576 512" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M56 225.6L32.4 296.2 32.4 96c0-35.3 28.7-64 64-64l138.7 0c13.8 0 27.3 4.5 38.4 12.8l38.4 28.8c5.5 4.2 12.3 6.4 19.2 6.4l117.3 0c35.3 0 64 28.7 64 64l0 16-365.4 0c-41.3 0-78 26.4-91.1 65.6zM477.8 448L99 448c-32.8 0-55.9-32.1-45.5-63.2l48-144C108 221.2 126.4 208 147 208l378.8 0c32.8 0 55.9 32.1 45.5 63.2l-48 144c-6.5 19.6-24.9 32.8-45.5 32.8z"/></svg>
+              </button>
+              <button
+                class="btn btn-danger"
+                id="delete-composer-preset-btn"
+                title="Delete selected preset"
+              >
+                <svg width="14" height="14" viewBox="0 0 448 512" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M136.7 5.9C141.1-7.2 153.3-16 167.1-16l113.9 0c13.8 0 26 8.8 30.4 21.9L320 32 416 32c17.7 0 32 14.3 32 32s-14.3 32-32 32L32 96C14.3 96 0 81.7 0 64S14.3 32 32 32l96 0 8.7-26.1zM32 144l384 0 0 304c0 35.3-28.7 64-64 64L96 512c-35.3 0-64-28.7-64-64l0-304zm88 64c-13.3 0-24 10.7-24 24l0 192c0 13.3 10.7 24 24 24s24-10.7 24-24l0-192c0-13.3-10.7-24-24-24zm104 0c-13.3 0-24 10.7-24 24l0 192c0 13.3 10.7 24 24 24s24-10.7 24-24l0-192c0-13.3-10.7-24-24-24zm104 0c-13.3 0-24 10.7-24 24l0 192c0 13.3 10.7 24 24 24s24-10.7 24-24l0-192c0-13.3-10.7-24-24-24z"/></svg>
+              </button>
+            </div>
+          </div>
+          <div id="chain-canvas" class="chain-canvas">
+            <div class="chain-toolbar">
+              <button class="btn btn-secondary" id="add-step-btn">
+                Add Step
+              </button>
+              <button class="btn btn-secondary" id="validate-chain-btn">
+                Validate Chain
+              </button>
+              <button class="btn btn-primary" id="run-chain-btn">
+                Run Chain
+              </button>
+              <button
+                class="btn btn-danger"
+                id="stop-run-btn"
+                style="display: none"
+              >
+                Stop
+              </button>
+            </div>
+            <div id="chain-cards" class="chain-cards"></div>
+          </div>
+          <div class="help-text">
+            Visual editor for multi-step automation chains. Steps connect in
+            sequence; supports templates and custom JavaScript execution.
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="dynamic-elements-input"
+            >Dynamic Elements (List, JSON, or function)</label
+          >
+          <div class="code-editor">
+            <div class="overlay-field">
+              <textarea
+                id="dynamic-elements-input"
+                rows="4"
+                placeholder='["item1", "item2", "item3"] or () => ["generated", "items"]'
+              ></textarea>
+              <button
+                class="tool-btn overlay"
+                id="format-dyn-elements-btn"
+                title="Format JSON"
+              >
+                { }
+              </button>
+              <button
+                class="tool-btn overlay"
+                id="apply-dyn-elements-btn"
+                style="right: 36px;"
+                title="Apply dynamic elements to runtime"
+              >
+                ▶
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="chain-json-input">Chain JSON (advanced):</label>
+          <div class="code-editor">
+            <textarea
+              id="chain-json-input"
+              rows="6"
+              placeholder='{
+      "entryId": "step-1",
+      "steps": [
+          {
+          "id": "step-1",
+          "type": "prompt",
+          "title": "Create message",
+          "template": "Hello {item}",
+          "next": "step-2"
+          },
+          {
+          "id": "step-2",
+          "type": "js",
+          "title": "Process response",
+          "code": "utils.log(\"Processing: \" + steps[\"step-1\"].response);"
+          }
+      ]
+      }'
+            ></textarea>
+            <div class="editor-tools">
+              <button
+                class="tool-btn"
+                id="format-chain-json-btn"
+                title="Format JSON"
+              >
+                { }
+              </button>
+            </div>
+          </div>
         </div>
       </div>
-      <div class="form-group" data-field="template">
-        <label for="step-template-input">Message Template</label>
-        <textarea
-          id="step-template-input"
-          rows="4"
-          class="settings-input"
-          placeholder="Template with placeholders like {{item}}, {{index}}, {{total}} or {steps.stepId.data}..."
-        ></textarea>
-        <label for="step-template-elements" style="margin-top: 8px"
-          >Dynamic Elements (JSON/function). Supports {placeholders}.</label
-        >
-        <div class="overlay-field">
-          <textarea
-            id="step-template-elements"
-            rows="3"
-            class="settings-input"
-            placeholder='["item1", "item2", "item3"] or () => ["generated", "items"]'
-          ></textarea>
+
+      <div class="tab-content" id="settings-tab">
+        <div class="form-group">
+          <label>Debug mode:</label>
+          <label class="checkbox-label">
+            <input type="checkbox" id="debug-mode-checkbox" />
+            <span class="checkmark"></span>
+            Enable debug logging
+          </label>
+        </div>
+        <div class="form-group">
+          <label>Batch settings:</label>
+          <div class="batch-controls">
+            <div class="batch-settings">
+              <label class="checkbox-label">
+                <input type="checkbox" id="loop-checkbox" />
+                <span class="checkmark"></span>
+                Process all items in batch
+              </label>
+              <label class="checkbox-label">
+                <input type="checkbox" id="auto-remove-checkbox" checked />
+                <span class="checkmark"></span>
+                Remove processed items from queue
+              </label>
+              <div class="wait-time-control">
+                <label for="wait-time-input">Wait between items (ms):</label>
+                <input
+                  type="number"
+                  id="wait-time-input"
+                  min="100"
+                  max="30000"
+                  value="2000"
+                  step="100"
+                />
+              </div>
+              <div class="wait-time-control">
+                <label for="step-wait-input">Wait between steps (ms):</label>
+                <input
+                  type="number"
+                  id="step-wait-input"
+                  min="0"
+                  max="30000"
+                  value="0"
+                  step="100"
+                />
+              </div>
+            </div>
+            <div class="batch-actions">
+              <button
+                id="stop-batch-btn"
+                class="btn btn-danger"
+                style="display: none"
+              >
+                Stop Batch
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="response-timeout-input">Response timeout (ms):</label>
+          <input
+            type="number"
+            id="response-timeout-input"
+            min="10000"
+            max="6000000"
+            step="1000"
+            class="settings-input timeout"
+          />
+        </div>
+        <div class="form-group">
+          <label>Panel size limits (px):</label>
+          <div class="size-inputs-grid"></div>
+        </div>
+        <div class="form-group">
+          <label>Visibility:</label>
+          <label class="checkbox-label">
+            <input type="checkbox" id="default-visible-checkbox" />
+            <span class="checkmark"></span>
+            Show panel by default
+          </label>
+          <div class="help-text">
+            Controls default visibility on page load. You can still toggle from
+            the header button.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="automation-log" id="log-container">
+      <div class="log-header">
+        <span>Activity Log</span>
+          <div class="log-header-controls">
+          <button class="tool-btn" id="stop-mini-btn" title="Stop" style="display: none">
+            <svg width="14" height="14" viewBox="0 0 448 512" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M64 32C77.3 32 88 42.7 88 56v400c0 13.3-10.7 24-24 24H40c-21.2 0-39.2-17.9-39.2-39.2V71.2C.8 50 18.8 32 40 32h24z"/></svg>
+          </button>
           <button
-            class="tool-btn overlay"
-            id="format-step-elements-btn"
-            title="Format JSON"
+            class="tool-btn"
+            id="toggle-auto-scroll-btn"
+            title="Toggle Auto-scroll"
           >
-            { }
+            <svg width="14" height="14" viewBox="0 0 512 512" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M64 256c0 106 86 192 192 192s192-86 192-192S362 64 256 64 64 150 64 256zm160-48h224v32H224v-32z"/></svg>
+          </button>
+          <button class="tool-btn" id="clear-log-btn" title="Clear Log">
+            <svg width="14" height="14" viewBox="0 0 448 512" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M136.7 5.9C141.1-7.2 153.3-16 167.1-16l113.9 0c13.8 0 26 8.8 30.4 21.9L320 32 416 32c17.7 0 32 14.3 32 32s-14.3 32-32 32L32 96C14.3 96 0 81.7 0 64S14.3 32 32 32l96 0 8.7-26.1zM32 144l384 0 0 304c0 35.3-28.7 64-64 64L96 512c-35.3 0-64-28.7-64-64l0-304zm88 64c-13.3 0-24 10.7-24 24l0 192c0 13.3 10.7 24 24 24s24-10.7 24-24l0-192c0-13.3-10.7-24-24-24zm104 0c-13.3 0-24 10.7-24 24l0 192c0 13.3 10.7 24 24 24s24-10.7 24-24l0-192c0-13.3-10.7-24-24-24zm104 0c-13.3 0-24 10.7-24 24l0 192c0 13.3 10.7 24 24 24s24-10.7 24-24l0-192c0-13.3-10.7-24-24-24z"/></svg>
           </button>
         </div>
-        <label class="checkbox-label" style="margin-top: 6px; display: block">
-          <input type="checkbox" id="step-use-dynamicelements-checkbox" />
-          <span class="checkmark"></span>
-          Use chain.dynamicElements as elements
-        </label>
-        <div class="help-text">
-          Batch processing: {{item}} for current item, {steps.stepId.response}
-          for previous step data
-        </div>
       </div>
-      <div class="form-group" data-field="http">
-        <label>HTTP Request</label>
-        <input
-          id="step-http-url"
-          class="settings-input"
-          placeholder="https://api.example.com/data or {steps.stepId.data.apiUrl}"
-        />
-        <div style="display: flex; gap: 8px; margin-top: 6px">
-          <select id="step-http-method" class="settings-input">
-            <option>GET</option>
-            <option>POST</option>
-            <option>PUT</option>
-            <option>DELETE</option>
+      <div class="log-content"></div>
+    </div>
+  </div>
+
+  <div class="resize-handle" id="resize-handle"></div>
+
+  <!-- Modal for editing a chain step -->
+  <div
+    id="chain-step-modal"
+    class="chain-modal"
+    aria-hidden="true"
+    style="display: none"
+  >
+    <div class="chain-modal-backdrop"></div>
+    <div
+      class="chain-modal-dialog"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="chain-step-title"
+    >
+      <div class="chain-modal-header">
+        <h4 id="chain-step-title">Edit Step</h4>
+        <div class="step-modal-presets">
+          <select
+            id="step-preset-select"
+            class="settings-input"
+            style="min-width: 120px"
+          >
+            <option value="">Select preset...</option>
           </select>
-          <div class="overlay-field">
-            <input
-              id="step-http-headers"
-              class="settings-input"
-              placeholder='{"Authorization": "Bearer {steps.authStep.data.token}"}'
+          <button
+            class="tool-btn"
+            id="save-step-preset-btn"
+            title="Save as preset"
+          >
+            <svg width="14" height="14" viewBox="0 0 448 512" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M64 32C28.7 32 0 60.7 0 96L0 416c0 35.3 28.7 64 64 64l320 0c35.3 0 64-28.7 64-64l0-242.7c0-17-6.7-33.3-18.7-45.3L352 50.7C340 38.7 323.7 32 306.7 32L64 32zm32 96c0-17.7 14.3-32 32-32l160 0c17.7 0 32 14.3 32 32l0 64c0 17.7-14.3 32-32 32l-160 0c-17.7 0-32-14.3-32-32l0-64zM224 288a64 64 0 1 1 0 128 64 64 0 1 1 0-128z"/></svg>
+          </button>
+          <button
+            class="tool-btn"
+            id="delete-step-preset-btn"
+            title="Delete preset"
+          >
+            <svg width="14" height="14" viewBox="0 0 448 512" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M136.7 5.9C141.1-7.2 153.3-16 167.1-16l113.9 0c13.8 0 26 8.8 30.4 21.9L320 32 416 32c17.7 0 32 14.3 32 32s-14.3 32-32 32L32 96C14.3 96 0 81.7 0 64S14.3 32 32 32l96 0 8.7-26.1zM32 144l384 0 0 304c0 35.3-28.7 64-64 64L96 512c-35.3 0-64-28.7-64-64l0-304zm88 64c-13.3 0-24 10.7-24 24l0 192c0 13.3 10.7 24 24 24s24-10.7 24-24l0-192c0-13.3-10.7-24-24-24zm104 0c-13.3 0-24 10.7-24 24l0 192c0 13.3 10.7 24 24 24s24-10.7 24-24l0-192c0-13.3-10.7-24-24-24zm104 0c-13.3 0-24 10.7-24 24l0 192c0 13.3 10.7 24 24 24s24-10.7 24-24l0-192c0-13.3-10.7-24-24-24z"/></svg>
+          </button>
+        </div>
+        <button class="header-btn" id="close-step-modal-btn" aria-label="Close">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+            <path
+              d="M18.3 5.71L12 12.01L5.7 5.71L4.29 7.12L10.59 13.42L4.29 19.72L5.7 21.13L12 14.83L18.3 21.13L19.71 19.72L13.41 13.42L19.71 7.12L18.3 5.71Z"
             />
+          </svg>
+        </button>
+      </div>
+      <div class="chain-modal-body">
+        <div class="form-group">
+          <label for="step-id-input">ID</label>
+          <input id="step-id-input" class="settings-input" placeholder="step-1" />
+        </div>
+        <div class="form-group">
+          <label for="step-title-input">Title</label>
+          <input
+            id="step-title-input"
+            class="settings-input"
+            placeholder="Describe the step"
+          />
+        </div>
+        <div class="form-group">
+          <label for="step-type-select">Type</label>
+          <select id="step-type-select" class="settings-input">
+            <option value="prompt">Prompt</option>
+            <option value="template">Template (Batch)</option>
+            <option value="js">JavaScript</option>
+            <option value="http">HTTP Request</option>
+          </select>
+        </div>
+        <div class="form-group" data-field="prompt">
+          <label for="step-response-type">Response Type</label>
+          <select id="step-response-type" class="settings-input">
+            <option value="text">Text</option>
+            <option value="image">Image</option>
+          </select>
+          <label class="checkbox-label" style="margin-top: 6px; display: block">
+            <input type="checkbox" id="step-newchat-checkbox" />
+            <span class="checkmark"></span>
+            Open in new chat before this step
+          </label>
+        </div>
+        <div class="form-group" data-field="prompt">
+          <label for="step-prompt-template">Message Template</label>
+          <textarea
+            id="step-prompt-template"
+            rows="4"
+            class="settings-input"
+            placeholder="Send a message to ChatGPT. Use {steps.stepId.response} to access previous step data."
+          ></textarea>
+          <div class="help-text">
+            Access previous step data: {steps.stepId.response} for prompts,
+            {steps.stepId.data} for HTTP, {steps.stepId.status} for HTTP status
+          </div>
+        </div>
+        <div class="form-group" data-field="template">
+          <label for="step-template-input">Message Template</label>
+          <textarea
+            id="step-template-input"
+            rows="4"
+            class="settings-input"
+            placeholder="Template with placeholders like {{item}}, {{index}}, {{total}} or {steps.stepId.data}..."
+          ></textarea>
+          <label for="step-template-elements" style="margin-top: 8px"
+            >Dynamic Elements (JSON/function). Supports {placeholders}.</label
+          >
+          <div class="overlay-field">
+            <textarea
+              id="step-template-elements"
+              rows="3"
+              class="settings-input"
+              placeholder='["item1", "item2", "item3"] or () => ["generated", "items"]'
+            ></textarea>
             <button
               class="tool-btn overlay"
-              id="format-http-headers-btn"
+              id="format-step-elements-btn"
               title="Format JSON"
             >
               { }
             </button>
           </div>
+          <label class="checkbox-label" style="margin-top: 6px; display: block">
+            <input type="checkbox" id="step-use-dynamicelements-checkbox" />
+            <span class="checkmark"></span>
+            Use chain.dynamicElements as elements
+          </label>
+          <div class="help-text">
+            Batch processing: {{item}} for current item, {steps.stepId.response}
+            for previous step data
+          </div>
         </div>
-        <div class="overlay-field">
-          <textarea
-            id="step-http-body"
-            rows="3"
+        <div class="form-group" data-field="http">
+          <label>HTTP Request</label>
+          <input
+            id="step-http-url"
             class="settings-input"
-            placeholder="Request body: {steps.stepId.response} or JSON data"
+            placeholder="https://api.example.com/data or {steps.stepId.data.apiUrl}"
+          />
+          <div style="display: flex; gap: 8px; margin-top: 6px">
+            <select id="step-http-method" class="settings-input">
+              <option>GET</option>
+              <option>POST</option>
+              <option>PUT</option>
+              <option>DELETE</option>
+            </select>
+            <div class="overlay-field">
+              <input
+                id="step-http-headers"
+                class="settings-input"
+                placeholder='{"Authorization": "Bearer {steps.authStep.data.token}"}'
+              />
+              <button
+                class="tool-btn overlay"
+                id="format-http-headers-btn"
+                title="Format JSON"
+              >
+                { }
+              </button>
+            </div>
+          </div>
+          <div class="overlay-field">
+            <textarea
+              id="step-http-body"
+              rows="3"
+              class="settings-input"
+              placeholder="Request body: {steps.stepId.response} or JSON data"
+            ></textarea>
+            <button
+              class="tool-btn overlay"
+              id="format-http-body-btn"
+              title="Format JSON"
+            >
+              { }
+            </button>
+          </div>
+          <div class="help-text">
+            Access response with {steps.thisStepId.data} or
+            {steps.thisStepId.status}. Use previous step data in URL/headers/body.
+          </div>
+        </div>
+        <div class="form-group" data-field="js">
+          <label for="step-js-code">JavaScript Code</label>
+          <textarea
+            id="step-js-code"
+            rows="6"
+            class="settings-input"
+            placeholder="// Access previous steps with steps.stepId.data or steps.stepId.response
+  // Available: response, log, console, item, index, total, http, steps, lastResponse
+  // Example: utils.log('API response:', steps.httpStep.data);"
           ></textarea>
-          <button
-            class="tool-btn overlay"
-            id="format-http-body-btn"
-            title="Format JSON"
-          >
-            { }
-          </button>
+          <div class="help-text">
+            Access step data with <code>steps.stepId.data</code> or
+            <code>steps.stepId.response</code>. Use <code>http</code> for API
+            calls, <code>utils.log()</code> for output.
+          </div>
         </div>
-        <div class="help-text">
-          Access response with {steps.thisStepId.data} or
-          {steps.thisStepId.status}. Use previous step data in URL/headers/body.
+        <div class="form-group">
+          <label for="step-next-select">Next step</label>
+          <select id="step-next-select" class="settings-input"></select>
         </div>
       </div>
-      <div class="form-group" data-field="js">
-        <label for="step-js-code">JavaScript Code</label>
-        <textarea
-          id="step-js-code"
-          rows="6"
-          class="settings-input"
-          placeholder="// Access previous steps with steps.stepId.data or steps.stepId.response
-// Available: response, log, console, item, index, total, http, steps, lastResponse
-// Example: utils.log('API response:', steps.httpStep.data);"
-        ></textarea>
-        <div class="help-text">
-          Access step data with <code>steps.stepId.data</code> or
-          <code>steps.stepId.response</code>. Use <code>http</code> for API
-          calls, <code>utils.log()</code> for output.
-        </div>
+      <div class="chain-modal-footer">
+        <button class="btn btn-secondary" id="delete-step-btn">Delete</button>
+        <button class="btn btn-primary" id="save-step-btn">Save</button>
       </div>
-      <div class="form-group">
-        <label for="step-next-select">Next step</label>
-        <select id="step-next-select" class="settings-input"></select>
-      </div>
-    </div>
-    <div class="chain-modal-footer">
-      <button class="btn btn-secondary" id="delete-step-btn">Delete</button>
-      <button class="btn btn-primary" id="save-step-btn">Save</button>
     </div>
   </div>
-</div>
-`;
+  `;
 
     // Add styles with ChatGPT-inspired design (guard against duplicates)
     let style = document.getElementById('chatgpt-automation-style');
@@ -1126,862 +1128,869 @@
       style = document.createElement('style');
       style.id = 'chatgpt-automation-style';
       style.textContent = /*css*/ `/* Base styles that adapt to ChatGPT's theme (scoped) */
-#chatgpt-automation-ui {
-  position: fixed;
-  top: 20px;
-  right: 20px;
-  height: auto;
-  width: auto;
-  background: var(--main-surface-primary, #ffffff);
-  border: 1px solid var(--border-medium, rgba(0, 0, 0, 0.1));
-  border-radius: 12px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
-  font-family: var(
-    --font-family,
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    Roboto,
-    sans-serif
-  );
-  z-index: 10000;
-  resize: both;
-  overflow: hidden;
-  backdrop-filter: blur(10px);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-#chatgpt-automation-ui.dark-mode {
-  background: var(--main-surface-primary, #2d2d30);
-  border-color: var(--border-medium, rgba(255, 255, 255, 0.1));
-  color: var(--text-primary, #ffffff);
-}
-
-#chatgpt-automation-ui.minimized {
-  resize: both;
-  height: 46px;
-  width: 600px;
-}
-#chatgpt-automation-ui.minimized.log-open {
-  height: 300px;
-}
-/* Hide main form when minimized */
-#chatgpt-automation-ui.minimized .automation-form {
-  display: none;
-}
-/* Keep progress container visible state-controlled; mini bars appear in header */
-
-/* Base content layout mirrors minimized behavior */
-#chatgpt-automation-ui .automation-content {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  height: calc(100% - 60px); /* Header height offset */
-}
-
-#chatgpt-automation-ui .automation-header {
-  background: linear-gradient(
-    135deg,
-    var(--brand-purple, #6366f1) 0%,
-    var(--brand-purple-darker, #4f46e5) 100%
-  );
-  color: white;
-  padding: 12px 16px;
-  border-radius: 12px 12px 0 0;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  cursor: move;
-  user-select: none;
-}
-
-#chatgpt-automation-ui .automation-header h3 {
-  margin: 0;
-  font-size: 15px;
-  font-weight: 600;
-  flex: 1;
-}
-
-#chatgpt-automation-ui .header-controls {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-#chatgpt-automation-ui .mini-progress {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 80px;
-}
-#chatgpt-automation-ui .mini-progress .mini-bar {
-  width: 60px;
-  height: 4px;
-  background: rgba(255, 255, 255, 0.3);
-  border-radius: 2px;
-  overflow: hidden;
-}
-#chatgpt-automation-ui .mini-progress .mini-fill {
-  height: 100%;
-  background: #22d3ee;
-  width: 0%;
-  transition: width 0.3s ease;
-}
-#chatgpt-automation-ui .mini-progress .mini-label {
-  font-size: 10px;
-  opacity: 0.85;
-}
-
-#chatgpt-automation-ui .status-indicator {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11px;
-  opacity: 0.9;
-}
-
-#chatgpt-automation-ui .status-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #10b981;
-  animation: pulse-idle 2s infinite;
-}
-
-#chatgpt-automation-ui .header-btn {
-  background: rgba(255, 255, 255, 0.1);
-  border: none;
-  border-radius: 4px;
-  padding: 4px;
-  color: white;
-  cursor: pointer;
-  transition: background 0.2s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-#chatgpt-automation-ui .header-btn:hover {
-  background: rgba(255, 255, 255, 0.2);
-}
-
-#chatgpt-automation-ui .automation-content {
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  /* Allow children to shrink/scroll correctly inside flex */
-  min-height: 0;
-  -webkit-overflow-scrolling: touch;
-}
-
-#chatgpt-automation-ui .progress-container {
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--border-light, rgba(0, 0, 0, 0.06));
-  background: var(--surface-secondary, #f8fafc);
-}
-/* Hide main progress container when minimized (header mini bars take over) */
-#chatgpt-automation-ui.minimized .progress-container {
-  display: none !important;
-}
-
-#chatgpt-automation-ui.dark-mode .progress-container {
-  background: var(--surface-secondary, #1e1e20);
-  border-color: var(--border-light, rgba(255, 255, 255, 0.06));
-}
-
-#chatgpt-automation-ui .progress-bar {
-  width: 100%;
-  height: 4px;
-  background: var(--border-light, rgba(0, 0, 0, 0.1));
-  border-radius: 2px;
-  overflow: hidden;
-  margin-bottom: 4px;
-}
-#chatgpt-automation-ui .progress-bar.sub {
-  background: var(--border-light, rgba(0, 0, 0, 0.1));
-}
-
-#chatgpt-automation-ui .progress-fill {
-  height: 100%;
-  background: var(--brand-purple, #6366f1);
-  transition: width 0.3s ease;
-}
-
-#chatgpt-automation-ui .progress-text {
-  font-size: 11px;
-  color: var(--text-secondary, #6b7280);
-  text-align: center;
-}
-#chatgpt-automation-ui .progress-text.sub {
-  opacity: 0.8;
-}
-
-#chatgpt-automation-ui .automation-form {
-  padding: 16px;
-  /* Keep natural height so logs fill remaining space */
-  flex: 0 0 auto;
-  overflow: auto;
-}
-
-#chatgpt-automation-ui .tab-container {
-  display: flex;
-  border-bottom: 1px solid var(--border-light, rgba(0, 0, 0, 0.06));
-  margin-bottom: 16px;
-}
-
-#chatgpt-automation-ui.dark-mode .tab-container {
-  border-color: var(--border-light, rgba(255, 255, 255, 0.06));
-}
-
-#chatgpt-automation-ui .tab-btn {
-  background: none;
-  border: none;
-  padding: 8px 16px;
-  cursor: pointer;
-  color: var(--text-secondary, #6b7280);
-  font-size: 13px;
-  font-weight: 500;
-  border-bottom: 2px solid transparent;
-  transition: all 0.2s;
-}
-
-#chatgpt-automation-ui .tab-btn.active {
-  color: var(--brand-purple, #6366f1);
-  border-color: var(--brand-purple, #6366f1);
-}
-
-#chatgpt-automation-ui .tab-content {
-  display: none;
-}
-
-#chatgpt-automation-ui .tab-content.active {
-  display: block;
-}
-
-#chatgpt-automation-ui .form-group {
-  margin-bottom: 16px;
-}
-
-#chatgpt-automation-ui .form-group label {
-  display: block;
-  margin-bottom: 6px;
-  font-weight: 500;
-  color: var(--text-primary, #374151);
-  font-size: 13px;
-}
-
-#chatgpt-automation-ui.dark-mode .form-group label {
-  color: var(--text-primary, #f3f4f6);
-}
-
-#chatgpt-automation-ui .form-group textarea {
-  width: 100%;
-  padding: 10px 12px;
-  border: 1px solid var(--border-medium, rgba(0, 0, 0, 0.1));
-  border-radius: 8px;
-  font-size: 13px;
-  resize: vertical;
-  font-family: "SF Mono", "Monaco", "Menlo", "Ubuntu Mono", monospace;
-  box-sizing: border-box;
-  background: var(--input-background, #ffffff);
-  color: var(--text-primary, #374151);
-  transition: border-color 0.2s, box-shadow 0.2s;
-}
-
-#chatgpt-automation-ui.dark-mode .form-group textarea {
-  background: var(--input-background, #1e1e20);
-  color: var(--text-primary, #f3f4f6);
-  border-color: var(--border-medium, rgba(255, 255, 255, 0.1));
-}
-
-#chatgpt-automation-ui .form-group textarea:focus {
-  outline: none;
-  border-color: var(--brand-purple, #6366f1);
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
-}
-
-#chatgpt-automation-ui .code-editor {
-  position: relative;
-}
-
-#chatgpt-automation-ui .editor-tools {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  display: flex;
-  gap: 4px;
-  opacity: 0;
-  transition: opacity 0.2s;
-}
-
-#chatgpt-automation-ui .code-editor:hover .editor-tools {
-  opacity: 1;
-}
-
-#chatgpt-automation-ui .tool-btn {
-  background: var(--surface-secondary, rgba(0, 0, 0, 0.05));
-  border: none;
-  border-radius: 4px;
-  padding: 4px 6px;
-  font-size: 10px;
-  cursor: pointer;
-  color: var(--text-secondary, #6b7280);
-  transition: background 0.2s;
-}
-
-#chatgpt-automation-ui .tool-btn:hover {
-  background: var(--surface-secondary, rgba(0, 0, 0, 0.1));
-}
-
-#chatgpt-automation-ui .help-text {
-  font-size: 11px;
-  color: var(--text-secondary, #6b7280);
-  margin-top: 4px;
-  font-style: italic;
-}
-
-#chatgpt-automation-ui .batch-controls {
-  margin-top: 12px;
-  padding: 12px;
-  background: var(--surface-secondary, #f8fafc);
-  border-radius: 6px;
-}
-
-#chatgpt-automation-ui.dark-mode .batch-controls {
-  background: var(--surface-secondary, #1e1e20);
-}
-
-#chatgpt-automation-ui .batch-settings {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-#chatgpt-automation-ui .batch-actions {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-}
-
-#chatgpt-automation-ui .wait-time-control {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 4px;
-}
-
-#chatgpt-automation-ui .wait-time-control label {
-  font-size: 12px;
-  margin: 0;
-  white-space: nowrap;
-  color: var(--text-primary, #374151);
-}
-
-#chatgpt-automation-ui.dark-mode .wait-time-control label {
-  color: var(--text-primary, #f3f4f6);
-}
-
-#chatgpt-automation-ui .wait-time-control input[type="number"] {
-  width: 80px;
-  padding: 4px 8px;
-  border: 1px solid var(--border-medium, rgba(0, 0, 0, 0.1));
-  border-radius: 4px;
-  font-size: 12px;
-  background: var(--input-background, #ffffff);
-  color: var(--text-primary, #374151);
-}
-
-#chatgpt-automation-ui.dark-mode .wait-time-control input[type="number"] {
-  background: var(--input-background, #1e1e20);
-  color: var(--text-primary, #f3f4f6);
-  border-color: var(--border-medium, rgba(255, 255, 255, 0.1));
-}
-
-#chatgpt-automation-ui .wait-time-control input[type="number"]:focus {
-  outline: none;
-  border-color: var(--brand-purple, #6366f1);
-  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.1);
-}
-
-/* Settings input styles */
-#chatgpt-automation-ui .settings-input {
-  padding: 6px 8px;
-  border: 1px solid var(--border-medium, rgba(0, 0, 0, 0.1));
-  border-radius: 6px;
-  font-size: 13px;
-  background: var(--input-background, #ffffff);
-  color: var(--text-primary, #374151);
-}
-
-#chatgpt-automation-ui.dark-mode .settings-input {
-  background: var(--input-background, #1e1e20);
-  color: var(--text-primary, #f3f4f6);
-  border-color: var(--border-medium, rgba(255, 255, 255, 0.1));
-}
-
-#chatgpt-automation-ui .settings-input:focus {
-  outline: none;
-  border-color: var(--brand-purple, #6366f1);
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
-}
-
-#chatgpt-automation-ui .settings-input.timeout {
-  width: 140px;
-}
-
-/* Overlay format button on hover */
-#chatgpt-automation-ui .overlay-field {
-  position: relative;
-}
-#chatgpt-automation-ui .overlay-field .overlay {
-  position: absolute;
-  right: 6px;
-  top: 6px;
-  opacity: 0;
-  transition: opacity 0.15s ease;
-}
-#chatgpt-automation-ui .overlay-field:hover .overlay {
-  opacity: 1;
-}
-
-#chatgpt-automation-ui .size-inputs-grid {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-#chatgpt-automation-ui .size-input-group {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-#chatgpt-automation-ui .size-input-group label {
-  font-size: 12px;
-  margin: 0;
-  color: var(--text-primary, #374151);
-}
-
-#chatgpt-automation-ui.dark-mode .size-input-group label {
-  color: var(--text-primary, #f3f4f6);
-}
-
-#chatgpt-automation-ui .settings-input.size {
-  width: 120px;
-}
-
-#chatgpt-automation-ui .checkbox-label {
-  display: flex;
-  align-items: center;
-  cursor: pointer;
-  font-size: 13px;
-  color: var(--text-primary, #374151);
-}
-
-#chatgpt-automation-ui.dark-mode .checkbox-label {
-  color: var(--text-primary, #f3f4f6);
-}
-
-#chatgpt-automation-ui .checkbox-label input[type="checkbox"] {
-  margin-right: 8px;
-}
-
-#chatgpt-automation-ui .form-actions {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-top: 16px;
-}
-
-#chatgpt-automation-ui .btn {
-  padding: 8px 16px;
-  border: none;
-  border-radius: 6px;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  position: relative;
-}
-
-#chatgpt-automation-ui .btn-primary {
-  background: var(--brand-purple, #6366f1);
-  color: white;
-}
-
-#chatgpt-automation-ui .btn-primary:hover {
-  background: var(--brand-purple-darker, #4f46e5);
-}
-
-#chatgpt-automation-ui .btn-secondary {
-  background: var(--surface-secondary, #f3f4f6);
-  color: var(--text-primary, #374151);
-  border: 1px solid var(--border-light, rgba(0, 0, 0, 0.06));
-}
-
-#chatgpt-automation-ui.dark-mode .btn-secondary {
-  background: var(--surface-secondary, #1e1e20);
-  color: var(--text-primary, #f3f4f6);
-  border-color: var(--border-light, rgba(255, 255, 255, 0.06));
-}
-
-#chatgpt-automation-ui .btn-secondary:hover {
-  background: var(--surface-secondary, #e5e7eb);
-}
-
-#chatgpt-automation-ui.dark-mode .btn-secondary:hover {
-  background: var(--surface-secondary, #2a2a2d);
-}
-
-#chatgpt-automation-ui .btn-danger {
-  background: #ef4444;
-  color: white;
-}
-
-#chatgpt-automation-ui .btn-danger:hover {
-  background: #dc2626;
-}
-
-#chatgpt-automation-ui .btn-warning {
-  background: #f59e0b;
-  color: white;
-}
-
-#chatgpt-automation-ui .btn-warning:hover {
-  background: #d97706;
-}
-
-#chatgpt-automation-ui .btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-#chatgpt-automation-ui .spinner {
-  width: 12px;
-  height: 12px;
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  border-top: 2px solid white;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  0% {
-    transform: rotate(0deg);
-  }
-  100% {
-    transform: rotate(360deg);
-  }
-}
-
-#chatgpt-automation-ui .automation-log {
-  border-top: 1px solid var(--border-light, rgba(0, 0, 0, 0.06));
-  /* Base height when expanded; can be resized */
-  height: 150px;
-  flex: 1 1 auto;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
-
-#chatgpt-automation-ui.dark-mode .automation-log {
-  border-color: var(--border-light, rgba(255, 255, 255, 0.06));
-}
-
-#chatgpt-automation-ui .log-header {
-  padding: 12px 16px;
-  background: var(--surface-secondary, #f8fafc);
-  font-weight: 500;
-  font-size: 13px;
-  color: var(--text-primary, #374151);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-#chatgpt-automation-ui.dark-mode .log-header {
-  background: var(--surface-secondary, #1e1e20);
-  color: var(--text-primary, #f3f4f6);
-}
-
-#chatgpt-automation-ui .log-header-controls {
-  display: flex;
-  gap: 4px;
-}
-
-#chatgpt-automation-ui .log-content {
-  padding: 16px;
-  overflow-y: auto;
-  scroll-behavior: smooth;
-  flex: 1 1 auto;
-  min-height: 0;
-}
-
-#chatgpt-automation-ui #step-next-select {
-  width: 100%;
-}
-
-#chatgpt-automation-ui .log-entry {
-  padding: 6px 0;
-  font-size: 11px;
-  font-family: "SF Mono", "Monaco", "Menlo", "Ubuntu Mono", monospace;
-  border-bottom: 1px solid var(--border-light, rgba(0, 0, 0, 0.03));
-  line-height: 1.4;
-}
-
-#chatgpt-automation-ui .log-entry:last-child {
-  border-bottom: none;
-  margin-bottom: 6px; /* extra space below last entry */
-}
-
-#chatgpt-automation-ui .log-info {
-  color: var(--text-primary, #374151);
-}
-
-#chatgpt-automation-ui.dark-mode .log-info {
-  color: var(--text-primary, #d1d5db);
-}
-
-#chatgpt-automation-ui .log-warning {
-  color: #f59e0b;
-}
-
-#chatgpt-automation-ui .log-error {
-  color: #ef4444;
-}
-
-#chatgpt-automation-ui .resize-handle {
-  position: absolute;
-  bottom: 0;
-  right: 0;
-  width: 20px;
-  height: 20px;
-  cursor: nw-resize;
-  background: linear-gradient(
-    -45deg,
-    transparent 0%,
-    transparent 40%,
-    var(--border-medium, rgba(0, 0, 0, 0.1)) 40%,
-    var(--border-medium, rgba(0, 0, 0, 0.1)) 60%,
-    transparent 60%,
-    transparent 100%
-  );
-}
-
-/* Chain canvas styles */
-#chatgpt-automation-ui .chain-canvas {
-  border: 1px dashed var(--border-light, rgba(0, 0, 0, 0.1));
-  border-radius: 8px;
-  padding: 8px;
-  min-height: 120px;
-}
-#chatgpt-automation-ui .chain-toolbar {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 8px;
-  flex-wrap: wrap;
-}
-#chatgpt-automation-ui .chain-cards {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  min-height: 80px;
-}
-
-/* Empty chain cards container */
-#chatgpt-automation-ui .chain-cards:empty {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--surface-secondary, #f8fafc);
-  border: 2px dashed var(--border-medium, rgba(0, 0, 0, 0.15));
-  border-radius: 12px;
-  padding: 32px 16px;
-  text-align: center;
-  color: var(--text-secondary, #6b7280);
-  font-size: 14px;
-  transition: all 0.2s ease;
-}
-#chatgpt-automation-ui.dark-mode .chain-cards:empty {
-  background: var(--surface-secondary, #1e1e20);
-  border-color: var(--border-medium, rgba(255, 255, 255, 0.15));
-  color: var(--text-secondary, #9ca3af);
-}
-#chatgpt-automation-ui .chain-cards:empty::before {
-  content: "🔗 No steps yet. Click 'Add Step' to start building your automation chain.";
-  font-weight: 500;
-}
-
-#chatgpt-automation-ui .chain-card {
-  background: var(--surface-secondary, #f8fafc);
-  border: 1px solid var(--border-light, rgba(0, 0, 0, 0.06));
-  border-radius: 8px;
-  padding: 8px;
-  min-width: 140px;
-  max-width: 200px;
-  position: relative;
-  transition: all 0.2s ease;
-}
-#chatgpt-automation-ui .chain-card:hover {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  transform: translateY(-1px);
-}
-#chatgpt-automation-ui.dark-mode .chain-card {
-  background: var(--surface-secondary, #1e1e20);
-  border-color: var(--border-light, rgba(255, 255, 255, 0.06));
-}
-#chatgpt-automation-ui.dark-mode .chain-card:hover {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-}
-#chatgpt-automation-ui .chain-card .title {
-  font-weight: 600;
-  font-size: 12px;
-  margin-bottom: 4px;
-}
-#chatgpt-automation-ui .chain-card .meta {
-  font-size: 11px;
-  opacity: 0.8;
-  margin-bottom: 6px;
-}
-#chatgpt-automation-ui .chain-card .actions {
-  display: flex;
-  gap: 6px;
-}
-
-/* Composer presets */
-#chatgpt-automation-ui .composer-presets {
-  margin-bottom: 12px;
-  padding: 8px;
-  background: var(--surface-secondary, #f8fafc);
-  border-radius: 8px;
-  border: 1px solid var(--border-light, rgba(0, 0, 0, 0.06));
-}
-#chatgpt-automation-ui.dark-mode .composer-presets {
-  background: var(--surface-secondary, #1e1e20);
-  border-color: var(--border-light, rgba(255, 255, 255, 0.06));
-}
-#chatgpt-automation-ui .composer-presets .preset-row {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-/* Modal */
-#chatgpt-automation-ui .chain-modal {
-  position: fixed;
-  inset: 0;
-  z-index: 10001;
-}
-#chatgpt-automation-ui .chain-modal-backdrop {
-  position: absolute;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.3);
-}
-#chatgpt-automation-ui .chain-modal-dialog {
-  position: relative;
-  background: var(--main-surface-primary, #fff);
-  width: 520px;
-  max-width: calc(100% - 32px);
-  margin: 40px auto;
-  border-radius: 10px;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
-  overflow: hidden;
-}
-#chatgpt-automation-ui.dark-mode .chain-modal-dialog {
-  background: var(--main-surface-primary, #2d2d30);
-}
-#chatgpt-automation-ui .chain-modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--border-light, rgba(0, 0, 0, 0.06));
-  gap: 12px;
-}
-#chatgpt-automation-ui .step-modal-presets {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-#chatgpt-automation-ui .chain-modal-body {
-  padding: 12px 16px;
-  max-height: 60vh;
-  overflow: auto;
-}
-#chatgpt-automation-ui .chain-modal-footer {
-  display: flex;
-  gap: 8px;
-  justify-content: flex-end;
-  padding: 12px 16px;
-  border-top: 1px solid var(--border-light, rgba(0, 0, 0, 0.06));
-}
-
-#chatgpt-automation-ui .presets-grid .preset-row {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 8px;
-  flex-wrap: wrap;
-}
-
-/* Responsive design */
-@media (max-width: 768px) {
   #chatgpt-automation-ui {
-    width: 320px;
-    right: 10px;
-    top: 10px;
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    height: auto;
+    width: auto;
+    background: var(--main-surface-primary, #ffffff);
+    border: 1px solid var(--border-medium, rgba(0, 0, 0, 0.1));
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+    font-family: var(
+      --font-family,
+      -apple-system,
+      BlinkMacSystemFont,
+      "Segoe UI",
+      Roboto,
+      sans-serif
+    );
+    z-index: 10000;
+    resize: both;
+    overflow: hidden;
+    backdrop-filter: blur(10px);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    /* Theme-driven accent colors sourced from ChatGPT theme tokens */
+    --accent: var(--theme-entity-accent, #6366f1);
+    --accent-strong: color-mix(in oklab, var(--accent) 85%, #000);
   }
-}
 
-/* Animation keyframes */
-@keyframes pulse-idle {
-  0%,
-  100% {
+  #chatgpt-automation-ui.dark-mode {
+    background: var(--main-surface-primary, #2d2d30);
+    border-color: var(--border-medium, rgba(255, 255, 255, 0.1));
+    color: var(--text-primary, #ffffff);
+  }
+
+  #chatgpt-automation-ui.minimized {
+    resize: both;
+    height: 46px;
+    width: 600px;
+  }
+  #chatgpt-automation-ui.minimized.log-open {
+    height: 300px;
+  }
+  /* Hide main form when minimized */
+  #chatgpt-automation-ui.minimized .automation-form {
+    display: none;
+  }
+  /* Keep progress container visible state-controlled; mini bars appear in header */
+
+  /* Base content layout mirrors minimized behavior */
+  #chatgpt-automation-ui .automation-content {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    height: calc(100% - 60px); /* Header height offset */
+  }
+
+  #chatgpt-automation-ui .automation-header {
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent-strong) 100%);
+    color: white;
+    padding: 12px 16px;
+    border-radius: 12px 12px 0 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: move;
+    user-select: none;
+  }
+
+  #chatgpt-automation-ui .automation-header h3 {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 600;
+    flex: 1;
+  }
+
+  #chatgpt-automation-ui .header-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  #chatgpt-automation-ui .mini-progress {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 80px;
+  }
+  #chatgpt-automation-ui .mini-progress .mini-bar {
+    width: 60px;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  #chatgpt-automation-ui .mini-progress .mini-fill {
+    height: 100%;
+    background: var(--accent);
+    width: 0%;
+    transition: width 0.3s ease;
+  }
+  #chatgpt-automation-ui .mini-progress .mini-label {
+    font-size: 10px;
+    opacity: 0.85;
+  }
+
+  #chatgpt-automation-ui .status-indicator {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    opacity: 0.9;
+  }
+
+  #chatgpt-automation-ui .status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #10b981;
+    animation: pulse-idle 2s infinite;
+  }
+
+  #chatgpt-automation-ui .header-btn {
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    border-radius: 4px;
+    padding: 4px;
+    color: white;
+    cursor: pointer;
+    transition: background 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  #chatgpt-automation-ui .header-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+  }
+
+  #chatgpt-automation-ui .automation-content {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    /* Allow children to shrink/scroll correctly inside flex */
+    min-height: 0;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  #chatgpt-automation-ui .progress-container {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border-light, rgba(0, 0, 0, 0.06));
+    background: var(--surface-secondary, #f8fafc);
+  }
+  /* Hide main progress container when minimized (header mini bars take over) */
+  #chatgpt-automation-ui.minimized .progress-container {
+    display: none !important;
+  }
+
+  #chatgpt-automation-ui.dark-mode .progress-container {
+    background: var(--surface-secondary, #1e1e20);
+    border-color: var(--border-light, rgba(255, 255, 255, 0.06));
+  }
+
+  #chatgpt-automation-ui .progress-bar {
+    width: 100%;
+    height: 4px;
+    background: var(--border-light, rgba(0, 0, 0, 0.1));
+    border-radius: 2px;
+    overflow: hidden;
+    margin-bottom: 4px;
+  }
+  #chatgpt-automation-ui .progress-bar.sub {
+    background: var(--border-light, rgba(0, 0, 0, 0.1));
+  }
+
+  #chatgpt-automation-ui .progress-fill {
+    height: 100%;
+    background: var(--accent);
+    transition: width 0.3s ease;
+  }
+
+  #chatgpt-automation-ui .progress-text {
+    font-size: 11px;
+    color: var(--text-secondary, #6b7280);
+    text-align: center;
+  }
+  #chatgpt-automation-ui .progress-text.sub {
+    opacity: 0.8;
+  }
+
+  #chatgpt-automation-ui .automation-form {
+    padding: 16px;
+    /* Keep natural height so logs fill remaining space */
+    flex: 0 0 auto;
+    overflow: auto;
+  }
+
+  #chatgpt-automation-ui .tab-container {
+    display: flex;
+    border-bottom: 1px solid var(--border-light, rgba(0, 0, 0, 0.06));
+    margin-bottom: 16px;
+  }
+
+  #chatgpt-automation-ui.dark-mode .tab-container {
+    border-color: var(--border-light, rgba(255, 255, 255, 0.06));
+  }
+
+  #chatgpt-automation-ui .tab-btn {
+    background: none;
+    border: none;
+    padding: 8px 16px;
+    cursor: pointer;
+    color: var(--text-secondary, #6b7280);
+    font-size: 13px;
+    font-weight: 500;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+  }
+
+  #chatgpt-automation-ui .tab-btn.active {
+    color: var(--accent);
+    border-color: var(--accent);
+  }
+
+  #chatgpt-automation-ui .tab-content {
+    display: none;
+  }
+
+  #chatgpt-automation-ui .tab-content.active {
+    display: block;
+  }
+
+  #chatgpt-automation-ui .form-group {
+    margin-bottom: 16px;
+  }
+
+  #chatgpt-automation-ui .form-group label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 500;
+    color: var(--text-primary, #374151);
+    font-size: 13px;
+  }
+
+  #chatgpt-automation-ui.dark-mode .form-group label {
+    color: var(--text-primary, #f3f4f6);
+  }
+
+  #chatgpt-automation-ui .form-group textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--border-medium, rgba(0, 0, 0, 0.1));
+    border-radius: 8px;
+    font-size: 13px;
+    resize: vertical;
+    font-family: "SF Mono", "Monaco", "Menlo", "Ubuntu Mono", monospace;
+    box-sizing: border-box;
+    background: var(--input-background, #ffffff);
+    color: var(--text-primary, #374151);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  #chatgpt-automation-ui.dark-mode .form-group textarea {
+    background: var(--input-background, #1e1e20);
+    color: var(--text-primary, #f3f4f6);
+    border-color: var(--border-medium, rgba(255, 255, 255, 0.1));
+  }
+
+  #chatgpt-automation-ui .form-group textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 25%, transparent);
+  }
+
+  #chatgpt-automation-ui .code-editor {
+    position: relative;
+  }
+
+  #chatgpt-automation-ui .editor-tools {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    display: flex;
+    gap: 4px;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  #chatgpt-automation-ui .code-editor:hover .editor-tools {
     opacity: 1;
   }
-  50% {
+
+  #chatgpt-automation-ui .tool-btn {
+    background: var(--surface-secondary, rgba(0, 0, 0, 0.05));
+    border: none;
+    border-radius: 4px;
+    padding: 4px 6px;
+    font-size: 10px;
+    cursor: pointer;
+    color: var(--text-secondary, #6b7280);
+    transition: background 0.2s;
+  }
+
+  #chatgpt-automation-ui .tool-btn:hover {
+    background: var(--surface-secondary, rgba(0, 0, 0, 0.1));
+  }
+
+  #chatgpt-automation-ui .help-text {
+    font-size: 11px;
+    color: var(--text-secondary, #6b7280);
+    margin-top: 4px;
+    font-style: italic;
+  }
+
+  #chatgpt-automation-ui .batch-controls {
+    margin-top: 12px;
+    padding: 12px;
+    background: var(--surface-secondary, #f8fafc);
+    border-radius: 6px;
+  }
+
+  #chatgpt-automation-ui.dark-mode .batch-controls {
+    background: var(--surface-secondary, #1e1e20);
+  }
+
+  #chatgpt-automation-ui .batch-settings {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  #chatgpt-automation-ui .batch-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  #chatgpt-automation-ui .wait-time-control {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 4px;
+  }
+
+  #chatgpt-automation-ui .wait-time-control label {
+    font-size: 12px;
+    margin: 0;
+    white-space: nowrap;
+    color: var(--text-primary, #374151);
+  }
+
+  #chatgpt-automation-ui.dark-mode .wait-time-control label {
+    color: var(--text-primary, #f3f4f6);
+  }
+
+  #chatgpt-automation-ui .wait-time-control input[type="number"] {
+    width: 80px;
+    padding: 4px 8px;
+    border: 1px solid var(--border-medium, rgba(0, 0, 0, 0.1));
+    border-radius: 4px;
+    font-size: 12px;
+    background: var(--input-background, #ffffff);
+    color: var(--text-primary, #374151);
+  }
+
+  #chatgpt-automation-ui.dark-mode .wait-time-control input[type="number"] {
+    background: var(--input-background, #1e1e20);
+    color: var(--text-primary, #f3f4f6);
+    border-color: var(--border-medium, rgba(255, 255, 255, 0.1));
+  }
+
+  #chatgpt-automation-ui .wait-time-control input[type="number"]:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px color-mix(in oklab, var(--accent) 25%, transparent);
+  }
+
+  /* Settings input styles */
+  #chatgpt-automation-ui .settings-input {
+    padding: 6px 8px;
+    border: 1px solid var(--border-medium, rgba(0, 0, 0, 0.1));
+    border-radius: 6px;
+    font-size: 13px;
+    background: var(--input-background, #ffffff);
+    color: var(--text-primary, #374151);
+  }
+
+  #chatgpt-automation-ui.dark-mode .settings-input {
+    background: var(--input-background, #1e1e20);
+    color: var(--text-primary, #f3f4f6);
+    border-color: var(--border-medium, rgba(255, 255, 255, 0.1));
+  }
+
+  #chatgpt-automation-ui .settings-input:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 25%, transparent);
+  }
+
+  #chatgpt-automation-ui .settings-input.timeout {
+    width: 140px;
+  }
+
+  /* Overlay format button on hover */
+  #chatgpt-automation-ui .overlay-field {
+    position: relative;
+  }
+  #chatgpt-automation-ui .overlay-field .overlay {
+    position: absolute;
+    right: 6px;
+    top: 6px;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+  }
+  #chatgpt-automation-ui .overlay-field:hover .overlay {
+    opacity: 1;
+  }
+
+  #chatgpt-automation-ui .size-inputs-grid {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  #chatgpt-automation-ui .size-input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  #chatgpt-automation-ui .size-input-group label {
+    font-size: 12px;
+    margin: 0;
+    color: var(--text-primary, #374151);
+  }
+
+  #chatgpt-automation-ui.dark-mode .size-input-group label {
+    color: var(--text-primary, #f3f4f6);
+  }
+
+  #chatgpt-automation-ui .settings-input.size {
+    width: 120px;
+  }
+
+  #chatgpt-automation-ui .checkbox-label {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--text-primary, #374151);
+  }
+
+  #chatgpt-automation-ui.dark-mode .checkbox-label {
+    color: var(--text-primary, #f3f4f6);
+  }
+
+  #chatgpt-automation-ui .checkbox-label input[type="checkbox"] {
+    margin-right: 8px;
+  }
+
+  #chatgpt-automation-ui .form-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 16px;
+  }
+
+  #chatgpt-automation-ui .btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    position: relative;
+  }
+
+  #chatgpt-automation-ui .btn-primary {
+    background: var(--accent);
+    color: white;
+  }
+
+  #chatgpt-automation-ui .btn-primary:hover {
+    background: var(--accent-strong);
+  }
+
+  #chatgpt-automation-ui .btn-secondary {
+    background: var(--surface-secondary, #f3f4f6);
+    color: var(--text-primary, #374151);
+    border: 1px solid var(--border-light, rgba(0, 0, 0, 0.06));
+  }
+
+  #chatgpt-automation-ui.dark-mode .btn-secondary {
+    background: var(--surface-secondary, #1e1e20);
+    color: var(--text-primary, #f3f4f6);
+    border-color: var(--border-light, rgba(255, 255, 255, 0.06));
+  }
+
+  #chatgpt-automation-ui .btn-secondary:hover {
+    background: var(--surface-secondary, #e5e7eb);
+  }
+
+  #chatgpt-automation-ui.dark-mode .btn-secondary:hover {
+    background: var(--surface-secondary, #2a2a2d);
+  }
+
+  #chatgpt-automation-ui .btn-danger {
+    background: #ef4444;
+    color: white;
+  }
+
+  #chatgpt-automation-ui .btn-danger:hover {
+    background: #dc2626;
+  }
+
+  #chatgpt-automation-ui .btn-warning {
+    background: #f59e0b;
+    color: white;
+  }
+
+  #chatgpt-automation-ui .btn-warning:hover {
+    background: #d97706;
+  }
+
+  #chatgpt-automation-ui .btn:disabled {
     opacity: 0.5;
+    cursor: not-allowed;
   }
-}
 
-@keyframes pulse-processing {
-  0%,
-  100% {
-    opacity: 1;
-    transform: scale(1);
+  #chatgpt-automation-ui .spinner {
+    width: 12px;
+    height: 12px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top: 2px solid white;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
   }
-  50% {
-    opacity: 0.7;
-    transform: scale(1.2);
+
+  @keyframes spin {
+    0% {
+      transform: rotate(0deg);
+    }
+    100% {
+      transform: rotate(360deg);
+    }
   }
-}
 
-#chatgpt-automation-ui .status-processing .status-dot {
-  background: #f59e0b;
-  animation: pulse-processing 1s infinite;
-}
+  #chatgpt-automation-ui .automation-log {
+    border-top: 1px solid var(--border-light, rgba(0, 0, 0, 0.06));
+    /* Base height when expanded; can be resized */
+    height: 150px;
+    flex: 1 1 auto;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
 
-#chatgpt-automation-ui .status-waiting .status-dot {
-  background: #3b82f6;
-  animation: pulse-processing 1.5s infinite;
-}
+  #chatgpt-automation-ui.dark-mode .automation-log {
+    border-color: var(--border-light, rgba(255, 255, 255, 0.06));
+  }
 
-#chatgpt-automation-ui .status-complete .status-dot {
-  background: #10b981;
-  animation: none;
-}
+  #chatgpt-automation-ui .log-header {
+    padding: 12px 16px;
+    background: var(--surface-secondary, #f8fafc);
+    font-weight: 500;
+    font-size: 13px;
+    color: var(--text-primary, #374151);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
 
-#chatgpt-automation-ui .status-error .status-dot {
-  background: #ef4444;
-  animation: pulse-processing 0.5s infinite;
-}
-`;
+  #chatgpt-automation-ui.dark-mode .log-header {
+    background: var(--surface-secondary, #1e1e20);
+    color: var(--text-primary, #f3f4f6);
+  }
+
+  #chatgpt-automation-ui .log-header-controls {
+    display: flex;
+    gap: 4px;
+  }
+
+  #chatgpt-automation-ui .log-content {
+    padding: 16px;
+    overflow-y: auto;
+    scroll-behavior: smooth;
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
+  #chatgpt-automation-ui #step-next-select {
+    width: 100%;
+  }
+
+  #chatgpt-automation-ui .log-entry {
+    padding: 6px 0;
+    font-size: 11px;
+    font-family: "SF Mono", "Monaco", "Menlo", "Ubuntu Mono", monospace;
+    border-bottom: 1px solid var(--border-light, rgba(0, 0, 0, 0.03));
+    line-height: 1.4;
+  }
+
+  #chatgpt-automation-ui .log-entry:last-child {
+    border-bottom: none;
+    margin-bottom: 6px; /* extra space below last entry */
+  }
+
+  #chatgpt-automation-ui .log-info {
+    color: var(--text-primary, #374151);
+  }
+
+  #chatgpt-automation-ui.dark-mode .log-info {
+    color: var(--text-primary, #d1d5db);
+  }
+
+  #chatgpt-automation-ui .log-warning {
+    color: #f59e0b;
+  }
+
+  #chatgpt-automation-ui .log-error {
+    color: #ef4444;
+  }
+
+  #chatgpt-automation-ui .resize-handle {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    width: 20px;
+    height: 20px;
+    cursor: nw-resize;
+    background: linear-gradient(
+      -45deg,
+      transparent 0%,
+      transparent 40%,
+      var(--border-medium, rgba(0, 0, 0, 0.1)) 40%,
+      var(--border-medium, rgba(0, 0, 0, 0.1)) 60%,
+      transparent 60%,
+      transparent 100%
+    );
+  }
+
+  /* Chain canvas styles */
+  #chatgpt-automation-ui .chain-canvas {
+    border: 1px dashed var(--border-light, rgba(0, 0, 0, 0.1));
+    border-radius: 8px;
+    padding: 8px;
+    min-height: 120px;
+  }
+  #chatgpt-automation-ui .chain-toolbar {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+  }
+  #chatgpt-automation-ui .chain-cards {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    min-height: 80px;
+  }
+
+  /* Empty chain cards container */
+  #chatgpt-automation-ui .chain-cards:empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--surface-secondary, #f8fafc);
+    border: 2px dashed var(--border-medium, rgba(0, 0, 0, 0.15));
+    border-radius: 12px;
+    padding: 32px 16px;
+    text-align: center;
+    color: var(--text-secondary, #6b7280);
+    font-size: 14px;
+    transition: all 0.2s ease;
+  }
+  #chatgpt-automation-ui.dark-mode .chain-cards:empty {
+    background: var(--surface-secondary, #1e1e20);
+    border-color: var(--border-medium, rgba(255, 255, 255, 0.15));
+    color: var(--text-secondary, #9ca3af);
+  }
+  #chatgpt-automation-ui .chain-cards:empty::before {
+    content: "🔗 No steps yet. Click 'Add Step' to start building your automation chain.";
+    font-weight: 500;
+  }
+
+  #chatgpt-automation-ui .chain-card {
+    background: var(--surface-secondary, #f8fafc);
+    border: 1px solid var(--border-light, rgba(0, 0, 0, 0.06));
+    border-radius: 8px;
+    padding: 8px;
+    min-width: 140px;
+    max-width: 200px;
+    position: relative;
+    transition: all 0.2s ease;
+  }
+  #chatgpt-automation-ui .chain-card:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    transform: translateY(-1px);
+  }
+  #chatgpt-automation-ui.dark-mode .chain-card {
+    background: var(--surface-secondary, #1e1e20);
+    border-color: var(--border-light, rgba(255, 255, 255, 0.06));
+  }
+  #chatgpt-automation-ui.dark-mode .chain-card:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  }
+  #chatgpt-automation-ui .chain-card .title {
+    font-weight: 600;
+    font-size: 12px;
+    margin-bottom: 4px;
+  }
+  #chatgpt-automation-ui .chain-card .meta {
+    font-size: 11px;
+    opacity: 0.8;
+    margin-bottom: 6px;
+  }
+  #chatgpt-automation-ui .chain-card .actions {
+    display: flex;
+    gap: 6px;
+  }
+
+  /* Composer presets */
+  #chatgpt-automation-ui .composer-presets {
+    margin-bottom: 12px;
+    padding: 8px;
+    background: var(--surface-secondary, #f8fafc);
+    border-radius: 8px;
+    border: 1px solid var(--border-light, rgba(0, 0, 0, 0.06));
+  }
+  #chatgpt-automation-ui.dark-mode .composer-presets {
+    background: var(--surface-secondary, #1e1e20);
+    border-color: var(--border-light, rgba(255, 255, 255, 0.06));
+  }
+  #chatgpt-automation-ui .composer-presets .preset-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+  /* Modal */
+  #chatgpt-automation-ui .chain-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 10001;
+  }
+  #chatgpt-automation-ui .chain-modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.3);
+  }
+  #chatgpt-automation-ui .chain-modal-dialog {
+    position: relative;
+    background: var(--main-surface-primary, #fff);
+    width: 520px;
+    max-width: calc(100% - 32px);
+    margin: 40px auto;
+    border-radius: 10px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+    overflow: hidden;
+  }
+  #chatgpt-automation-ui.dark-mode .chain-modal-dialog {
+    background: var(--main-surface-primary, #2d2d30);
+  }
+  #chatgpt-automation-ui .chain-modal-dialog .header-btn {
+    /* Ensure the close button inside the modal inherits modal text color
+       and uses a transparent background so it's visible in light mode */
+    background: transparent;
+    color: inherit;
+    padding: 6px;
+    border: none;
+  }
+  #chatgpt-automation-ui .chain-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border-light, rgba(0, 0, 0, 0.06));
+    gap: 12px;
+  }
+  #chatgpt-automation-ui .step-modal-presets {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  #chatgpt-automation-ui .chain-modal-body {
+    padding: 12px 16px;
+    max-height: 60vh;
+    overflow: auto;
+  }
+  #chatgpt-automation-ui .chain-modal-footer {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    padding: 12px 16px;
+    border-top: 1px solid var(--border-light, rgba(0, 0, 0, 0.06));
+  }
+
+  #chatgpt-automation-ui .presets-grid .preset-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+  }
+
+  /* Responsive design */
+  @media (max-width: 768px) {
+    #chatgpt-automation-ui {
+      width: 320px;
+      right: 10px;
+      top: 10px;
+    }
+  }
+
+  /* Animation keyframes */
+  @keyframes pulse-idle {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.5;
+    }
+  }
+
+  @keyframes pulse-processing {
+    0%,
+    100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.7;
+      transform: scale(1.2);
+    }
+  }
+
+  #chatgpt-automation-ui .status-processing .status-dot {
+    background: #f59e0b;
+    animation: pulse-processing 1s infinite;
+  }
+
+  #chatgpt-automation-ui .status-waiting .status-dot {
+    background: #3b82f6;
+    animation: pulse-processing 1.5s infinite;
+  }
+
+  #chatgpt-automation-ui .status-complete .status-dot {
+    background: #10b981;
+    animation: none;
+  }
+
+  #chatgpt-automation-ui .status-error .status-dot {
+    background: #ef4444;
+    animation: pulse-processing 0.5s infinite;
+  }
+  `;
       document.head.appendChild(style);
     }
     document.body.appendChild(ui.mainContainer);
@@ -2654,13 +2663,13 @@
                   : step.type;
 
         card.innerHTML = `
-                        <div class="title">${step.title || step.id || '(untitled)'}</div>
-                        <div class="meta">type: ${typeDisplay}${step.next ? ` → ${step.next}` : ''}</div>
-                        <div class="actions">
-                            <button class="btn btn-secondary btn-sm" data-action="edit" title="Edit step">✏️</button>
-                            <button class="btn btn-danger btn-sm" data-action="delete" title="Delete step">🗑️</button>
-                        </div>
-                    `;
+                          <div class="title">${step.title || step.id || '(untitled)'}</div>
+                          <div class="meta">type: ${typeDisplay}${step.next ? ` → ${step.next}` : ''}</div>
+                          <div class="actions">
+                              <button class="btn btn-secondary btn-sm" data-action="edit" title="Edit step"><svg width="14" height="14" viewBox="0 0 640 640" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M100.4 417.2C104.5 402.6 112.2 389.3 123 378.5L304.2 197.3L338.1 163.4C354.7 180 389.4 214.7 442.1 267.4L476 301.3L442.1 335.2L260.9 516.4C250.2 527.1 236.8 534.9 222.2 539L94.4 574.6C86.1 576.9 77.1 574.6 71 568.4C64.9 562.2 62.6 553.3 64.9 545L100.4 417.2zM156 413.5C151.6 418.2 148.4 423.9 146.7 430.1L122.6 517L209.5 492.9C215.9 491.1 221.7 487.8 226.5 483.2L155.9 413.5zM510 267.4C493.4 250.8 458.7 216.1 406 163.4L372 129.5C398.5 103 413.4 88.1 416.9 84.6C430.4 71 448.8 63.4 468 63.4C487.2 63.4 505.6 71 519.1 84.6L554.8 120.3C568.4 133.9 576 152.3 576 171.4C576 190.5 568.4 209 554.8 222.5C551.3 226 536.4 240.9 509.9 267.4z"/></svg></button>
+                              <button class="btn btn-danger btn-sm" data-action="delete" title="Delete step"><svg width="14" height="14" viewBox="0 0 448 512" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M136.7 5.9C141.1-7.2 153.3-16 167.1-16l113.9 0c13.8 0 26 8.8 30.4 21.9L320 32 416 32c17.7 0 32 14.3 32 32s-14.3 32-32 32L32 96C14.3 96 0 81.7 0 64S14.3 32 32 32l96 0 8.7-26.1zM32 144l384 0 0 304c0 35.3-28.7 64-64 64L96 512c-35.3 0-64-28.7-64-64l0-304zm88 64c-13.3 0-24 10.7-24 24l0 192c0 13.3 10.7 24 24 24s24-10.7 24-24l0-192c0-13.3-10.7-24-24-24zm104 0c-13.3 0-24 10.7-24 24l0 192c0 13.3 10.7 24 24 24s24-10.7 24-24l0-192c0-13.3-10.7-24-24-24zm104 0c-13.3 0-24 10.7-24 24l0 192c0 13.3 10.7 24 24 24s24-10.7 24-24l0-192c0-13.3-10.7-24-24-24z"/></svg></button>
+                          </div>
+                      `;
 
         card
           .querySelector('[data-action="edit"]')
