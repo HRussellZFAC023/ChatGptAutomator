@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ChatGPT Automation Pro
 // @namespace    http://tampermonkey.net/
-// @version      2.4
+// @version      2.5
 // @description  Advanced ChatGPT automation with dynamic templating
 // @author       Henry Russell
 // @match        https://chatgpt.com/*
@@ -12,6 +12,7 @@
 // @grant        GM_xmlhttpRequest
 // @connect      *
 // @run-at       document-end
+// @inject-into  auto
 // @updateURL    https://raw.githubusercontent.com/HRussellZFAC023/ChatGptAutomator/main/chatgptAutomation.js
 // @downloadURL  https://raw.githubusercontent.com/HRussellZFAC023/ChatGptAutomator/main/chatgptAutomation.js
 // @license      MIT
@@ -27,7 +28,7 @@
     RUN_LOCK_TTL_MS: 15000,
     RUN_LOCK_RENEW_MS: 5000,
     BATCH_WAIT_TIME: 2000,
-    AUTO_REMOVE_PROCESSED: true,
+    AUTO_REMOVE_PROCESSED: false,
     AUTO_SCROLL_LOGS: true,
   };
 
@@ -45,6 +46,7 @@
     autoRemoveProcessed: CONFIG.AUTO_REMOVE_PROCESSED,
     isProcessing: false,
     currentBatchIndex: 0,
+    processedCount: 0,
     chainDefinition: null,
     runLockId: null,
     runLockTimer: null,
@@ -68,6 +70,7 @@
     presetsResponseJS: 'presets.responseJS',
     presetsSteps: 'presets.steps',
     logHistory: 'log.history',
+    logVisible: 'log.visible',
     runLockKey: 'chatgptAutomation.runLock',
     configDebug: 'config.debugMode',
     configTimeout: 'config.responseTimeout',
@@ -463,7 +466,6 @@
       await utils.sleep(500);
     },
 
-    // DRY: type + send + wait, returns { el, text }
     ask: async (message) => {
       await chatGPT.typeMessage(message);
       await utils.sleep(300);
@@ -516,8 +518,11 @@
             if (!isGenerating) {
               clearTimeout(timeout);
               if (state.responseObserver) state.responseObserver.disconnect();
-              state.lastResponseElement = latestMessage;
-              resolve(latestMessage);
+              // Prefer the full assistant turn container (article) which holds images/content
+              const container =
+                latestMessage.closest('article[data-turn="assistant"]') || latestMessage;
+              state.lastResponseElement = container;
+              resolve(container);
             }
           }
         };
@@ -545,33 +550,28 @@
     // Extract image URLs from an assistant response element
     extractResponseImages: (responseElement) => {
       if (!responseElement) return [];
-      const found = new Set();
-      // 1) Direct <img alt="Generated image">
+      const urls = new Set();
       try {
-        responseElement
-          .querySelectorAll('img[alt="Generated image"]')
-          .forEach((img) => img.getAttribute('src') && found.add(img.getAttribute('src')));
-      } catch {}
-      // 2) Any container with aria-label="Generated image" and its descendant imgs
-      try {
-        responseElement
-          .querySelectorAll('[aria-label="Generated image"] img')
-          .forEach((img) => img.getAttribute('src') && found.add(img.getAttribute('src')));
-      } catch {}
-      // 3) Known imagegen container fallback
-      try {
-        responseElement
-          .querySelectorAll('.group/imagegen-image img')
-          .forEach((img) => img.getAttribute('src') && found.add(img.getAttribute('src')));
-      } catch {}
-      // 4) Language-agnostic fallback: any img within this assistant message
-      try {
-        responseElement
-          .querySelectorAll('img')
-          .forEach((img) => img.getAttribute('src') && found.add(img.getAttribute('src')));
-      } catch {}
-      // Do NOT use class selector with a slash (invalid without escaping). Avoid global queries to prevent cross-message bleed.
-      return Array.from(found);
+        // Search within the assistant article scope
+        const scope =
+          responseElement.closest && responseElement.closest('article[data-turn="assistant"]')
+            ? responseElement.closest('article[data-turn="assistant"]')
+            : responseElement;
+
+        // Get all generated images, excluding blurred ones
+        scope.querySelectorAll('div[id^="image-"] img[alt="Generated image"]').forEach((img) => {
+          const src = img.getAttribute('src');
+          // Skip blurred backdrop images (they have blur-2xl or scale-110 in their parent)
+          const isBlurred = img.closest('.blur-2xl') || img.closest('.scale-110');
+          if (src && !isBlurred) {
+            log('🖼️ Found image: ' + src);
+            urls.add(src);
+          }
+        });
+      } catch (e) {
+        log('❌ Error in extractResponseImages: ' + e.message, 'error');
+      }
+      return Array.from(urls);
     },
   };
 
@@ -890,6 +890,7 @@
     <div class="log-header">
       <span>Activity Log</span>
       <div class="log-header-controls">
+        <button class="tool-btn" id="stop-mini-btn" title="Stop" style="display: none">🛑</button>
         <button
           class="tool-btn"
           id="toggle-auto-scroll-btn"
@@ -897,7 +898,6 @@
         >
           📜
         </button>
-        <button class="tool-btn" id="stop-mini-btn" title="Stop">🛑</button>
         <button class="tool-btn" id="clear-log-btn" title="Clear Log">
           🗑️
         </button>
@@ -1156,8 +1156,8 @@
 
 #chatgpt-automation-ui.minimized {
   resize: both;
-  height: 56px;
-  width: 520px;
+  height: 46px;
+  width: 600px;
 }
 #chatgpt-automation-ui.minimized.log-open {
   height: 300px;
@@ -2266,6 +2266,35 @@
     ui.miniSubLabel.textContent = `${done}/${total}`;
   };
 
+  // Unified progress helper that clamps values and drives header mini bars
+  const refreshBatchProgress = (doneLike, totalLike) => {
+    const total = Math.max(0, Number(totalLike || 0));
+    const done = Math.max(0, Math.min(Number(doneLike || 0), total));
+    updateProgress(done, total);
+    return { done, total };
+  };
+
+  // Safely remove N items from the head of dynamicElements, keep JSON/textarea in sync
+  const removeHeadItems = (count = 1) => {
+    if (!Array.isArray(state.dynamicElements) || count <= 0) return;
+    try {
+      state.dynamicElements.splice(0, count);
+    } catch {}
+    try {
+      if (!state.chainDefinition) {
+        const txt = document.getElementById('chain-json-input')?.value || '{}';
+        state.chainDefinition = JSON.parse(txt);
+      }
+      state.chainDefinition.dynamicElements = state.dynamicElements;
+      const chainInput = document.getElementById('chain-json-input');
+      if (chainInput) chainInput.value = JSON.stringify(state.chainDefinition, null, 2);
+    } catch {}
+    try {
+      const dynEl = document.getElementById('dynamic-elements-input');
+      if (dynEl) dynEl.value = JSON.stringify(state.dynamicElements, null, 2);
+    } catch {}
+  };
+
   // Allow canceling long runs
   const stopBatchProcessing = () => {
     state.cancelRequested = true;
@@ -2368,7 +2397,7 @@
       if (ui.mainContainer) {
         ui.mainContainer.classList.toggle('log-open', willShow);
       }
-      utils.saveToStorage('log.visible', willShow);
+      utils.saveToStorage(STORAGE_KEYS.logVisible, willShow);
     };
     document.getElementById('header-log-toggle').addEventListener('click', toggleLogVisibility);
 
@@ -2386,6 +2415,8 @@
       if (stopRunBtn) stopRunBtn.style.display = 'none';
       const stopBtn = document.getElementById('stop-batch-btn');
       if (stopBtn) stopBtn.style.display = 'none';
+      const stopMini = document.getElementById('stop-mini-btn');
+      if (stopMini) stopMini.style.display = 'none';
     });
 
     // Toggle auto-scroll button
@@ -2559,7 +2590,7 @@
     // Restore log visibility
     try {
       const logWrap = document.getElementById('log-container');
-      const vis = GM_getValue('log.visible', true);
+      const vis = GM_getValue(STORAGE_KEYS.logVisible, false);
       if (logWrap) {
         logWrap.style.display = vis ? 'flex' : 'none';
       }
@@ -2933,7 +2964,7 @@
           if (logWrap && logWrap.style.display === 'none') {
             logWrap.style.display = 'flex';
             if (ui.mainContainer) ui.mainContainer.classList.add('log-open');
-            utils.saveToStorage('log.visible', true);
+            utils.saveToStorage(STORAGE_KEYS.logVisible, true);
           }
         } catch {}
         try {
@@ -2962,101 +2993,104 @@
     }
     if (runChainBtn)
       runChainBtn.addEventListener('click', async () => {
-        // No UI dynamic elements input; start with empty unless inferred in steps
-        state.dynamicElements = [];
+        // When running, load whatever is currently in the dynamic elements textarea
+        try {
+          const dynEl = document.getElementById('dynamic-elements-input');
+          let items = [];
+          if (dynEl) {
+            const raw = (dynEl.value || '').trim();
+            if (raw) {
+              if (raw.startsWith('[') || raw.startsWith('{')) {
+                try {
+                  const parsed = JSON.parse(raw);
+                  items = Array.isArray(parsed) ? parsed : [parsed];
+                } catch (e) {
+                  // fallback to processor for function-style inputs
+                  try {
+                    const parsed = await processors.parseDynamicElements(raw);
+                    items = Array.isArray(parsed) ? parsed : [parsed];
+                  } catch {}
+                }
+              } else {
+                try {
+                  const parsed = await processors.parseDynamicElements(raw);
+                  items = Array.isArray(parsed) ? parsed : [parsed];
+                } catch {}
+              }
+            }
+          }
+          state.dynamicElements = items;
+          // If the new list is shorter than what we've already processed, clamp the current index
+          try {
+            if (
+              typeof state.currentBatchIndex === 'number' &&
+              state.currentBatchIndex > items.length
+            ) {
+              state.currentBatchIndex = Math.max(0, items.length);
+            }
+          } catch {}
+          // Keep chainDefinition in sync so the JSON reflects the runtime items
+          try {
+            if (!state.chainDefinition) {
+              state.chainDefinition = JSON.parse(
+                document.getElementById('chain-json-input').value || '{}'
+              );
+            }
+            state.chainDefinition.dynamicElements = items;
+            const chainInput = document.getElementById('chain-json-input');
+            if (chainInput) chainInput.value = JSON.stringify(state.chainDefinition, null, 2);
+          } catch {}
+        } catch (e) {
+          utils.log('Failed to read dynamic elements before run: ' + e.message, 'warning');
+        }
+
         if (stopRunBtn) stopRunBtn.style.display = 'inline-flex';
         await runChainWithBatch();
         if (stopRunBtn) stopRunBtn.style.display = 'none';
       });
 
-    const formatChainBtn = document.getElementById('format-chain-json-btn');
-    if (formatChainBtn)
-      formatChainBtn.addEventListener('click', () => {
+    // Generic JSON formatter for overlay buttons
+    const registerJsonFormatter = (btnId, inputId, opts = {}) => {
+      const btn = document.getElementById(btnId);
+      if (!btn) return;
+      btn.addEventListener('click', async () => {
         try {
-          const obj = JSON.parse(chainInput.value);
-          chainInput.value = JSON.stringify(obj, null, 2);
-          // keep in-memory def in sync
-          state.chainDefinition = obj;
-          refreshChainCards();
-          utils.log('Chain JSON formatted');
-          utils.saveToStorage(STORAGE_KEYS.chainDef, chainInput.value);
-        } catch (e) {
-          utils.log('Invalid JSON: ' + e.message, 'error');
-        }
-      });
-
-    // Formatting for other JSON-capable fields
-    const dynFormatBtn = document.getElementById('format-dyn-elements-btn');
-    if (dynFormatBtn) {
-      dynFormatBtn.addEventListener('click', async () => {
-        try {
-          const src = document.getElementById('dynamic-elements-input');
+          const src = document.getElementById(inputId);
           if (!src) return;
-          const val = src.value.trim();
+          const val = (src.value || '').trim();
           if (!val) return;
           let parsed;
-          if (val.startsWith('[') || val.startsWith('{')) parsed = JSON.parse(val);
+          if (!opts.allowFunction && (val.startsWith('[') || val.startsWith('{')))
+            parsed = JSON.parse(val);
           else parsed = await processors.parseDynamicElements(val);
           src.value = JSON.stringify(parsed, null, 2);
-          utils.log('Dynamic elements formatted');
+          utils.log(`${opts.label || 'JSON'} formatted`);
         } catch (e) {
-          utils.log('Invalid dynamic elements: ' + e.message, 'error');
+          utils.log(`Invalid ${opts.label || 'value'}: ${e.message}`, 'error');
         }
       });
-    }
+    };
 
-    const stepElemsFormatBtn = document.getElementById('format-step-elements-btn');
-    if (stepElemsFormatBtn) {
-      stepElemsFormatBtn.addEventListener('click', async () => {
-        try {
-          const src = document.getElementById('step-template-elements');
-          if (!src) return;
-          const val = src.value.trim();
-          if (!val) return;
-          let parsed;
-          if (val.startsWith('[') || val.startsWith('{')) parsed = JSON.parse(val);
-          else parsed = await processors.parseDynamicElements(val);
-          src.value = JSON.stringify(parsed, null, 2);
-          utils.log('Step elements formatted');
-        } catch (e) {
-          utils.log('Invalid step elements: ' + e.message, 'error');
-        }
-      });
-    }
-
-    const httpHeadersFormatBtn = document.getElementById('format-http-headers-btn');
-    if (httpHeadersFormatBtn) {
-      httpHeadersFormatBtn.addEventListener('click', () => {
-        try {
-          const src = document.getElementById('step-http-headers');
-          if (!src) return;
-          const val = src.value.trim();
-          if (!val) return;
-          const obj = JSON.parse(val);
-          src.value = JSON.stringify(obj, null, 2);
-          utils.log('HTTP headers formatted');
-        } catch (e) {
-          utils.log('Invalid headers JSON: ' + e.message, 'error');
-        }
-      });
-    }
-
-    const httpBodyFormatBtn = document.getElementById('format-http-body-btn');
-    if (httpBodyFormatBtn) {
-      httpBodyFormatBtn.addEventListener('click', () => {
-        try {
-          const src = document.getElementById('step-http-body');
-          if (!src) return;
-          const val = src.value.trim();
-          if (!val) return;
-          const obj = JSON.parse(val);
-          src.value = JSON.stringify(obj, null, 2);
-          utils.log('HTTP body formatted');
-        } catch (e) {
-          utils.log('Invalid body JSON: ' + e.message, 'error');
-        }
-      });
-    }
+    registerJsonFormatter('format-chain-json-btn', 'chain-json-input', {
+      label: 'Chain JSON',
+      allowFunction: false,
+    });
+    registerJsonFormatter('format-dyn-elements-btn', 'dynamic-elements-input', {
+      label: 'Dynamic elements',
+      allowFunction: true,
+    });
+    registerJsonFormatter('format-step-elements-btn', 'step-template-elements', {
+      label: 'Step elements',
+      allowFunction: true,
+    });
+    registerJsonFormatter('format-http-headers-btn', 'step-http-headers', {
+      label: 'HTTP headers',
+      allowFunction: false,
+    });
+    registerJsonFormatter('format-http-body-btn', 'step-http-body', {
+      label: 'HTTP body',
+      allowFunction: false,
+    });
 
     // Change events to keep cards in sync and persist data
     if (chainInput) {
@@ -3087,6 +3121,16 @@
           if (!raw) {
             state.dynamicElements = [];
             utils.log('Dynamic elements cleared');
+            try {
+              if (!state.chainDefinition) {
+                const txt = document.getElementById('chain-json-input')?.value || '{}';
+                state.chainDefinition = JSON.parse(txt);
+              }
+              state.chainDefinition.dynamicElements = [];
+              const chainInput = document.getElementById('chain-json-input');
+              if (chainInput) chainInput.value = JSON.stringify(state.chainDefinition, null, 2);
+            } catch {}
+            refreshBatchProgress(0, 0);
             return;
           }
           let items;
@@ -3095,8 +3139,68 @@
           if (!Array.isArray(items)) items = [items];
           state.dynamicElements = items;
           utils.log(`Applied ${items.length} dynamic element(s) to runtime`);
+          try {
+            if (!state.chainDefinition) {
+              const txt = document.getElementById('chain-json-input')?.value || '{}';
+              state.chainDefinition = JSON.parse(txt);
+            }
+            state.chainDefinition.dynamicElements = items;
+            const chainInput = document.getElementById('chain-json-input');
+            if (chainInput) chainInput.value = JSON.stringify(state.chainDefinition, null, 2);
+          } catch {}
+          if (!state.isProcessing) refreshBatchProgress(0, items.length);
         } catch (e) {
           utils.log('Invalid dynamic elements: ' + e.message, 'error');
+        }
+      });
+    }
+    // Live-sync dynamic elements while running: when user edits the textarea during a run,
+    // parse and update state.dynamicElements and the chain JSON so the running batch reflects changes.
+    const dynInputEl = document.getElementById('dynamic-elements-input');
+    if (dynInputEl) {
+      dynInputEl.addEventListener('input', async (e) => {
+        // If not processing, do nothing — user must press Apply to change runtime by default.
+        if (!state.isProcessing) return;
+        try {
+          const raw = (e.target.value || '').trim();
+          let items = [];
+          if (raw) {
+            if (raw.startsWith('[') || raw.startsWith('{')) {
+              try {
+                const parsed = JSON.parse(raw);
+                items = Array.isArray(parsed) ? parsed : [parsed];
+              } catch {
+                try {
+                  const parsed = await processors.parseDynamicElements(raw);
+                  items = Array.isArray(parsed) ? parsed : [parsed];
+                } catch {}
+              }
+            } else {
+              try {
+                const parsed = await processors.parseDynamicElements(raw);
+                items = Array.isArray(parsed) ? parsed : [parsed];
+              } catch {}
+            }
+          }
+          // Replace live items but preserve already-processed count by removing leading items
+          // that were already processed when appropriate. Simpler approach: replace full list.
+          state.dynamicElements = items;
+          // Update chain JSON representation for visibility
+          try {
+            if (!state.chainDefinition)
+              state.chainDefinition = JSON.parse(
+                document.getElementById('chain-json-input').value || '{}'
+              );
+            state.chainDefinition.dynamicElements = items;
+            const chainInput = document.getElementById('chain-json-input');
+            if (chainInput) chainInput.value = JSON.stringify(state.chainDefinition, null, 2);
+          } catch {}
+          utils.log(`Runtime dynamic elements updated (${items.length} items) while running`);
+          // Refresh header progress: denominator = processed so far + remaining items
+          const done = Math.max(0, Number(state.processedCount || 0));
+          refreshBatchProgress(Math.min(done, done + items.length), done + items.length);
+        } catch (err) {
+          utils.log('Failed to live-apply dynamic elements: ' + err.message, 'error');
         }
       });
     }
@@ -3237,7 +3341,7 @@
           null,
           2
         ),
-        'Reddit JSON Demo': JSON.stringify(
+        'Reddit JSON': JSON.stringify(
           {
             dynamicElements: ['javascript'],
             entryId: 'redditGet',
@@ -3252,14 +3356,21 @@
               {
                 id: 'logJson',
                 type: 'js',
-                code: 'const raw = steps.redditGet?.rawText ?? steps.redditGet?.data;\nconst data = typeof raw === "string" ? JSON.parse(raw) : raw;\nlog("Example of how you might transform the Reddit Listing JSON:");\nlog(JSON.stringify({ kind: "Listing", data: { children: [{ data: { title: "Example post title", author: "example_user" } }] } }, null, 2));\nif (data?.data?.children?.length) {\n  const top = data.data.children[0].data;\n  log(`Top post: ${top.title} by ${top.author}`);\n}\nreturn null;',
+                code:
+                  'const raw = steps.redditGet?.rawText ?? steps.redditGet?.data;\n' +
+                  'const data = typeof raw === "string" ? (function(){ try { return JSON.parse(raw); } catch(e){ return raw; } })() : raw;\n' +
+                  'const children = Array.isArray(data?.data?.children) ? data.data.children : [];\n' +
+                  'const posts = children.slice(0,10).map(c => { const d = c.data || {}; return { title: d.title, author: d.author, subreddit: d.subreddit, score: d.score, num_comments: d.num_comments, id: d.id, url: d.url }; });\n' +
+                  'const summary = { kind: data?.kind || "Listing", topPosts: posts };\n' +
+                  'log(`Prepared reddit summary with ${posts.length} posts`);\n' +
+                  'return JSON.stringify(summary);',
                 next: 'summarize',
               },
               {
                 id: 'summarize',
                 type: 'prompt',
                 template:
-                  'We fetched reddit JSON. Explain how to extract the top post title and author from a typical Reddit Listing payload. Do not require code execution.',
+                  'I have a compact reddit summary: {steps.logJson.response}\n\nBased on this summary, what interesting insights or patterns do you observe about trending topics, engagement (score vs comments), or subreddit activity?',
               },
             ],
           },
@@ -3654,39 +3765,109 @@
           items = ['London', 'Tokyo', 'New York'];
         }
       }
-      const total = Math.max(1, items.length || 1);
+      // Use live state.dynamicElements so runtime edits affect the remaining items.
       const stopBtn = document.getElementById('stop-batch-btn');
       if (stopBtn) stopBtn.style.display = 'inline-flex';
       const stopRunBtn = document.getElementById('stop-run-btn');
       if (stopRunBtn) stopRunBtn.style.display = 'inline-flex';
+      const stopMini = document.getElementById('stop-mini-btn');
+      if (stopMini) stopMini.style.display = 'inline-flex';
       state.cancelRequested = false;
-      // Initialize progress immediately so header shows bar from first item
-      updateProgress(0, total);
+      state.currentBatchIndex = 0;
+      state.processedCount = 0;
       updateSubProgress(0, 0);
-      if (items.length === 0) {
+
+      // If there are no dynamic elements, allow a single run with null item
+      const liveItems = Array.isArray(state.dynamicElements) ? state.dynamicElements : [];
+      if (!liveItems || liveItems.length === 0) {
         // Single run with empty item
-        await processChain(state.chainDefinition, { item: null, index: 1, total });
+        refreshBatchProgress(0, 0);
+        await processChain(state.chainDefinition, { item: null, index: 1, total: 1 });
       } else {
-        for (let i = 0; i < items.length; i++) {
+        let processed = 0;
+        // Loop until we've processed all available items or cancel is requested
+        while (true) {
           if (state.cancelRequested) {
             utils.log('Run canceled');
             break;
           }
-          const item = items[i];
-          // Show progress for current step before executing
-          updateProgress(i, total);
-          utils.log(`🔗 Chain run for item ${i + 1}/${items.length}`);
-          await processChain(state.chainDefinition, { item, index: i + 1, total: items.length });
+
+          const itemsNow = Array.isArray(state.dynamicElements) ? state.dynamicElements : [];
+          const totalNow = Math.max(0, itemsNow.length);
+
+          // If no items remain, we're done
+          if (totalNow === 0) {
+            break;
+          }
+
+          // Update progress using processed count and dynamic total (processed + remaining)
+          // Ensure currentBatchIndex reflects what we've processed so far for live updates
+          state.currentBatchIndex = processed;
+          state.processedCount = processed;
+          refreshBatchProgress(processed, processed + totalNow);
+
+          // Determine the next item to process
+          let itemToProcess;
+          if (state.autoRemoveProcessed) {
+            // Always take the first item
+            itemToProcess = itemsNow[0];
+            if (typeof state.dynamicElements.shift === 'function') {
+              // We'll remove after processing to avoid racing with input handlers
+            }
+          } else {
+            // Use processed as index; if out of range, break (may happen if list shrank)
+            if (processed >= itemsNow.length) break;
+            itemToProcess = itemsNow[processed];
+          }
+
+          utils.log(`🔗 Chain run for item ${processed + 1}/${processed + totalNow}`);
+          await processChain(state.chainDefinition, {
+            item: itemToProcess,
+            index: processed + 1,
+            total: totalNow,
+          });
+
           if (state.cancelRequested) {
             utils.log('Run canceled');
             break;
           }
-          // Then increment after completion
-          updateProgress(i + 1, total);
-          if (i < items.length - 1) {
+
+          // After processing, update the runtime list according to auto-remove
+          if (state.autoRemoveProcessed) {
+            removeHeadItems(1);
+            processed += 1;
+            state.currentBatchIndex = processed;
+            state.processedCount = processed;
+          } else {
+            processed += 1;
+            state.processedCount = processed;
+          }
+
+          // Sync chain JSON so edits are reflected
+          try {
+            if (!state.chainDefinition)
+              state.chainDefinition = JSON.parse(
+                document.getElementById('chain-json-input').value || '{}'
+              );
+            state.chainDefinition.dynamicElements = state.dynamicElements;
+            const chainInput = document.getElementById('chain-json-input');
+            if (chainInput) chainInput.value = JSON.stringify(state.chainDefinition, null, 2);
+          } catch {}
+
+          // Update progress after completion of this item; denominator = processed + remaining
+          const remainingNow = Array.isArray(state.dynamicElements)
+            ? state.dynamicElements.length
+            : 0;
+          refreshBatchProgress(processed, processed + remainingNow);
+
+          // Wait between items when there are still items left
+          const remaining = Array.isArray(state.dynamicElements) ? state.dynamicElements.length : 0;
+          if (remaining > 0) {
             utils.log(`⏱️ Waiting ${state.batchWaitTime}ms before next item…`);
             await utils.sleep(state.batchWaitTime);
+            continue;
           }
+          break;
         }
       }
       utils.log('🏁 Chain batch completed');
@@ -3696,12 +3877,14 @@
       releaseRunLock();
       state.isProcessing = false;
       updateStatus('idle');
-      updateProgress(0, 0);
+      refreshBatchProgress(0, 0);
       updateSubProgress(0, 0);
       const stopBtn = document.getElementById('stop-batch-btn');
       if (stopBtn) stopBtn.style.display = 'none';
       const stopRunBtn = document.getElementById('stop-run-btn');
       if (stopRunBtn) stopRunBtn.style.display = 'none';
+      const stopMini = document.getElementById('stop-mini-btn');
+      if (stopMini) stopMini.style.display = 'none';
     }
   };
 
