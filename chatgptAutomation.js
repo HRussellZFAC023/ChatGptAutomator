@@ -567,12 +567,12 @@
           // Skip blurred backdrop images (they have blur-2xl or scale-110 in their parent)
           const isBlurred = img.closest('.blur-2xl') || img.closest('.scale-110');
           if (src && !isBlurred) {
-            log('🖼️ Found image: ' + src);
+            utils.log('🖼️ Found image: ' + src);
             urls.add(src);
           }
         });
       } catch (e) {
-        log('❌ Error in extractResponseImages: ' + e.message, 'error');
+        utils.log('❌ Error in extractResponseImages: ' + e.message, 'error');
       }
       return Array.from(urls);
     },
