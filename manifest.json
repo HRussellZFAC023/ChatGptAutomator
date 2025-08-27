@@ -1,0 +1,17 @@
+{
+  "name": "ChatGPT Automation Pro",
+  "description": "Advanced ChatGPT automation with dynamic templating",
+  "version": "2.5",
+  "manifest_version": 3,
+  "background": {
+    "scripts": ["background.js"],
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://chatgpt.com/*", "https://chat.openai.com/*"],
+      "js": ["chatgptAutomation.js"],
+      "run_at": "document_end"
+    }
+  ]
+}
