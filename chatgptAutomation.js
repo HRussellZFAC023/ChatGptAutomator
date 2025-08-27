@@ -32,6 +32,25 @@
     AUTO_SCROLL_LOGS: true,
   };
 
+  // --- Eval Capability Detection (Chrome MV3/Tampermonkey CSP) ---
+  // Some environments (e.g., Chrome + Tampermonkey on CSP-heavy sites like chatgpt.com) block
+  // dynamic code evaluation (`eval`/`Function`). Detect once and adapt behavior.
+  const ENV = (() => {
+    let canEval = true;
+    try {
+      // Using the Function constructor directly to test, same mechanism used by custom code runner
+      // eslint-disable-next-line no-new-func
+      new Function('return 1')();
+    } catch (e) {
+      canEval = false;
+    }
+    return {
+      CAN_EVAL: canEval,
+      IS_CHROME: typeof navigator !== 'undefined' && /Chrome\//.test(navigator.userAgent),
+      IS_FIREFOX: typeof navigator !== 'undefined' && /Firefox\//.test(navigator.userAgent),
+    };
+  })();
+
   const state = {
     isLooping: false,
     dynamicElements: [],
@@ -276,44 +295,60 @@
           );
         }
 
-        // Use sandbox-safe Function constructor; await Promise if returned
-        const Fn = function () {}.constructor; // constructor of a sandboxed function
-        const fn = new Fn(
-          'response',
-          'log',
-          'console',
-          'item',
-          'index',
-          'total',
-          'http',
-          'steps',
-          'lastResponse',
-          'GM_getValue',
-          'GM_setValue',
-          'GM_xmlhttpRequest',
-          'unsafeWindow',
-          'utils',
-          code
-        );
-        const result = fn(
-          responseText,
-          (msg, type = 'info') => utils.log(msg, type),
-          console,
-          item,
-          index,
-          total,
-          http,
-          stepsCtx,
-          lastResponse,
-          GM_getValue,
-          GM_setValue,
-          GM_xmlhttpRequest,
-          unsafeWindow,
-          utils
-        );
-        await Promise.resolve(result);
-        utils.log('Custom code executed successfully');
-        return result;
+        if (ENV.CAN_EVAL) {
+          // Use sandbox-safe Function constructor; await Promise if returned
+          const Fn = function () {}.constructor; // constructor of a sandboxed function
+          const fn = new Fn(
+            'response',
+            'log',
+            'console',
+            'item',
+            'index',
+            'total',
+            'http',
+            'steps',
+            'lastResponse',
+            'GM_getValue',
+            'GM_setValue',
+            'GM_xmlhttpRequest',
+            'unsafeWindow',
+            'utils',
+            code
+          );
+          const result = fn(
+            responseText,
+            (msg, type = 'info') => utils.log(msg, type),
+            console,
+            item,
+            index,
+            total,
+            http,
+            stepsCtx,
+            lastResponse,
+            GM_getValue,
+            GM_setValue,
+            GM_xmlhttpRequest,
+            unsafeWindow,
+            utils
+          );
+          await Promise.resolve(result);
+          utils.log('Custom code executed successfully');
+          return result;
+        } else {
+          // Safe fallback: no dynamic code evaluation due to CSP (Chrome MV3/Tampermonkey).
+          // Attempt to auto-parse JSON and return a useful object.
+          let data = responseText;
+          if (typeof data === 'string') {
+            const trimmed = data.trim();
+            if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+              try {
+                data = JSON.parse(trimmed);
+              } catch {}
+            }
+          }
+          utils.log('Custom JS is disabled here (CSP blocks unsafe-eval). Returned parsed response instead.', 'warn');
+          return data;
+        }
       } catch (error) {
         utils.log(`Custom code execution error: ${error.message}`, 'error');
         throw error;
@@ -342,26 +377,45 @@
       const raw = (input || '').trim();
       if (!raw) return [];
 
-      if (raw.startsWith('[')) {
+      // Primary: JSON arrays/objects
+      if (raw.startsWith('[') || raw.startsWith('{')) {
         try {
-          return JSON.parse(raw);
+          const parsed = JSON.parse(raw);
+          return Array.isArray(parsed) ? parsed : [parsed];
         } catch (e) {
           utils.log(`Invalid JSON: ${e.message}`, 'error');
           return [];
         }
       }
 
-      if (raw.startsWith('{')) {
-        try {
-          const obj = JSON.parse(raw);
-          return [obj];
-        } catch {}
+      // Chrome-safe fallback when expressions are provided (no eval):
+      // Support simple CSV / newline separated values and numeric ranges like 1..5
+      if (!ENV.CAN_EVAL) {
+        const lines = raw.split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
+        const parts = lines.length > 1 ? lines : raw.split(',').map((s) => s.trim()).filter(Boolean);
+        const out = [];
+        for (const p of parts) {
+          const m = p.match(/^(\d+)\.\.(\d+)$/);
+          if (m) {
+            const a = parseInt(m[1], 10), b = parseInt(m[2], 10);
+            const step = a <= b ? 1 : -1;
+            for (let x = a; step > 0 ? x <= b : x >= b; x += step) out.push(x);
+          } else if (/^\d+(?:\.\d+)?$/.test(p)) {
+            out.push(Number(p));
+          } else if ((p.startsWith('"') && p.endsWith('"')) || (p.startsWith("'") && p.endsWith("'"))) {
+            out.push(p.slice(1, -1));
+          } else {
+            // treat as literal string
+            out.push(p);
+          }
+        }
+        return out;
       }
 
+      // Legacy (Firefox): evaluate expression (may return array/object/stringified JSON)
       try {
-        const Fn = function () {}.constructor;
-        const fn = new Fn('return ( ' + raw + ' )');
-        const v = fn();
+        // eslint-disable-next-line no-new-func
+        const v = new Function('return ( ' + raw + ' )')();
         const res = typeof v === 'function' ? v() : v;
         if (Array.isArray(res)) return res;
         if (res && typeof res === 'object') return [res];
@@ -372,9 +426,9 @@
             if (parsed && typeof parsed === 'object') return [parsed];
           } catch {}
         }
-        throw new Error('Result is not an array/object');
-      } catch (error) {
-        utils.log(`Error parsing dynamic elements: ${error.message}`, 'error');
+        return [res];
+      } catch (e) {
+        utils.log(`Dynamic element expression not supported here: ${e.message}`, 'warn');
         return [];
       }
     },
