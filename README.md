@@ -2,7 +2,7 @@
 
 Automate ChatGPT in your browser. Type → send → wait → run your code. Batch‑friendly. Zero copy‑paste.
 
-<banner alt="ChatGPT Automation Pro banner"/>
+![alt text](image.png)
 
 > **Why this exists** — Prompting is easy. Repeating it 100× with clean logs, templating, and API glue isn’t. This gives you an on‑page automation panel that behaves like a tiny orchestration tool.
 
@@ -17,7 +17,6 @@ Automate ChatGPT in your browser. Type → send → wait → run your code. Batc
 * **Image capture** — auto‑extract generated image URLs.
 * **Theme‑aware UI** — dark/light, draggable, resizable, persistent state.
 
-![alt text](image.png)
 ---
 
 ## Install
