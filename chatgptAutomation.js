@@ -3407,7 +3407,6 @@
         ),
         'Reddit JSON': JSON.stringify(
           {
-            dynamicElements: ['javascript'],
             entryId: 'redditGet',
             steps: [
               {
