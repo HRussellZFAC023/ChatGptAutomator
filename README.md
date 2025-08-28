@@ -22,22 +22,9 @@ Automate ChatGPT in your browser. Type → send → wait → run your code. Batc
 
 ## Install
 
-**Option A — Userscript (fastest)**
-
 1. Install Tampermonkey.
 2. Open the raw script URL and install: `<userscript_raw_url/>`.
 3. Go to chat.openai.com (or chatgpt.com) → click **Automation** in the header.
-
-**Option B — Browser Extension (Chrome/Edge/Firefox)**
-
-* Load unpacked from `webextension/` (contains `manifest.json`).
-* Or build the distributable ZIP.
-
-```bash
-# Build the distributable extension zip
-webextension/package.sh
-# → dist/chatgpt-automation-pro-extension.zip
-```
 
 **Quick verify**
 
