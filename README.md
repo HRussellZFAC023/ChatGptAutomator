@@ -16,6 +16,8 @@ Automate ChatGPT in your browser: type, send, wait, then run your code on the re
 - Batch mode with templates: {item.foo}, {{index}}, nested paths
 - Polished panel: tabs, progress, logs, dark mode, saved position
 - CORS-safe HTTP helper to call any API from your code
+- Auto-detects your ChatGPT interface language via `<html lang>` and applies built-in translations to the automation panel (supports 30 languages: Albanian, Amharic, Arabic, Armenian, Bengali, Bosnian, Bulgarian, Burmese, Catalan, Chinese, Croatian, Czech, Danish, Dutch, Estonian, Finnish, French, Georgian, German, Greek, Gujarati, Hindi, Hungarian, Icelandic, Indonesian, Italian, Japanese, Kannada, Kazakh, Korean). All strings are bundled locally—no external translation services.
+- Every panel label, help tip, and log message is translated, so the interface is fully localized in your language of choice.
 
 ## Quick start
 1) Simple tab: paste a message → Send
