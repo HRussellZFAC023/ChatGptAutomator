@@ -5650,7 +5650,6 @@ for (const lang in extraTranslations) {
         ),
         'Reddit JSON': JSON.stringify(
           {
-            dynamicElements: ['javascript'],
             entryId: 'redditGet',
             steps: [
               {
