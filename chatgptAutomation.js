@@ -195,6 +195,25 @@
       return null;
     },
 
+    setSafeHTML: (el, html) => {
+      const template = document.createElement('template');
+      template.innerHTML = html;
+      template.content
+        .querySelectorAll('script, iframe, object, embed')
+        .forEach((e) => e.remove());
+      const walker = document.createTreeWalker(
+        template.content,
+        NodeFilter.SHOW_ELEMENT
+      );
+      while (walker.nextNode()) {
+        const node = walker.currentNode;
+        [...node.attributes].forEach((attr) => {
+          if (/^on/i.test(attr.name)) node.removeAttribute(attr.name);
+        });
+      }
+      el.replaceChildren(template.content);
+    },
+
     loadFromStorage: (key, def) => {
       try {
         return GM_getValue(key, def);
@@ -2713,7 +2732,7 @@ for (const lang in extraTranslations) {
       if (!input) throw new Error('Chat input not found');
 
       if (input.tagName === 'DIV') {
-        input.innerHTML = '';
+        input.textContent = '';
         input.focus();
         const paragraph = document.createElement('p');
         paragraph.textContent = message;
@@ -2855,7 +2874,9 @@ for (const lang in extraTranslations) {
     ui.mainContainer = document.createElement('div');
     ui.mainContainer.id = 'chatgpt-automation-ui';
     ui.mainContainer.className = state.isDarkMode ? 'dark-mode' : 'light-mode';
-    ui.mainContainer.innerHTML = translator.replaceHTML(/*html*/ `<div class="automation-header" id="automation-header">
+    utils.setSafeHTML(
+      ui.mainContainer,
+      translator.replaceHTML(/*html*/ `<div class="automation-header" id="automation-header">
     <h3>ChatGPT Automation Pro</h3>
     <div class="header-controls">
       <div
@@ -3384,7 +3405,7 @@ for (const lang in extraTranslations) {
       </div>
     </div>
   </div>
-  `);
+  `));
 
     // Add styles with ChatGPT-inspired design (guard against duplicates)
     let style = document.getElementById('chatgpt-automation-style');
@@ -4405,7 +4426,7 @@ for (const lang in extraTranslations) {
     btn.title = label;
     btn.setAttribute('aria-label', label);
     btn.className = 'btn relative btn-ghost text-token-text-primary';
-    btn.innerHTML = translator.replaceHTML(`<div class="flex w-full items-center justify-center gap-1.5"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640" width="20" height="20" fill="currentColor" class="icon"><path d="M273 151.1L288 171.8L303 151.1C328 116.5 368.2 96 410.9 96C484.4 96 544 155.6 544 229.1L544 231.7C544 249.3 540.6 267.3 534.5 285.4C512.7 276.8 488.9 272 464 272C358 272 272 358 272 464C272 492.5 278.2 519.6 289.4 544C288.9 544 288.5 544 288 544C272.5 544 257.2 539.4 244.9 529.9C171.9 474.2 32 343.9 32 231.7L32 229.1C32 155.6 91.6 96 165.1 96C207.8 96 248 116.5 273 151.1zM320 464C320 384.5 384.5 320 464 320C543.5 320 608 384.5 608 464C608 543.5 543.5 608 464 608C384.5 608 320 543.5 320 464zM497.4 387C491.6 382.8 483.6 383 478 387.5L398 451.5C392.7 455.7 390.6 462.9 392.9 469.3C395.2 475.7 401.2 480 408 480L440.9 480L425 522.4C422.5 529.1 424.8 536.7 430.6 541C436.4 545.3 444.4 545 450 540.5L530 476.5C535.3 472.3 537.4 465.1 535.1 458.7C532.8 452.3 526.8 448 520 448L487.1 448L503 405.6C505.5 398.9 503.2 391.3 497.4 387z"/></svg><span class="max-md:hidden">Automation</span></div>`);
+    utils.setSafeHTML(btn, translator.replaceHTML(`<div class="flex w-full items-center justify-center gap-1.5"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640" width="20" height="20" fill="currentColor" class="icon"><path d="M273 151.1L288 171.8L303 151.1C328 116.5 368.2 96 410.9 96C484.4 96 544 155.6 544 229.1L544 231.7C544 249.3 540.6 267.3 534.5 285.4C512.7 276.8 488.9 272 464 272C358 272 272 358 272 464C272 492.5 278.2 519.6 289.4 544C288.9 544 288.5 544 288 544C272.5 544 257.2 539.4 244.9 529.9C171.9 474.2 32 343.9 32 231.7L32 229.1C32 155.6 91.6 96 165.1 96C207.8 96 248 116.5 273 151.1zM320 464C320 384.5 384.5 320 464 320C543.5 320 608 384.5 608 464C608 543.5 543.5 608 464 608C384.5 608 320 543.5 320 464zM497.4 387C491.6 382.8 483.6 383 478 387.5L398 451.5C392.7 455.7 390.6 462.9 392.9 469.3C395.2 475.7 401.2 480 408 480L440.9 480L425 522.4C422.5 529.1 424.8 536.7 430.6 541C436.4 545.3 444.4 545 450 540.5L530 476.5C535.3 472.3 537.4 465.1 535.1 458.7C532.8 452.3 526.8 448 520 448L487.1 448L503 405.6C505.5 398.9 503.2 391.3 497.4 387z"/></svg><span class="max-md:hidden">Automation</span></div>`));
     btn.addEventListener('click', () => {
       // If UI was removed by a re-render, recreate it
       let panel = document.getElementById('chatgpt-automation-ui');
@@ -4658,7 +4679,7 @@ for (const lang in extraTranslations) {
 
     // Clear log button
     document.getElementById('clear-log-btn').addEventListener('click', () => {
-      if (ui.logContainer) ui.logContainer.innerHTML = '';
+      if (ui.logContainer) ui.logContainer.textContent = '';
       utils.saveToStorage(STORAGE_KEYS.logHistory, []);
       utils.log('Log cleared');
     });
@@ -4860,7 +4881,7 @@ for (const lang in extraTranslations) {
     const chainCards = document.getElementById('chain-cards');
     const refreshChainCards = () => {
       if (!chainCards) return;
-      chainCards.innerHTML = '';
+      chainCards.textContent = '';
       let chain;
       try {
         chain = JSON.parse(chainInput.value || '{}');
@@ -4905,14 +4926,16 @@ for (const lang in extraTranslations) {
                   ? 'HTTP Request'
                   : step.type;
 
-        card.innerHTML = translator.replaceHTML(`
+        utils.setSafeHTML(
+          card,
+          translator.replaceHTML(`
                           <div class="title">${step.title || step.id || '(untitled)'}</div>
                           <div class="meta">type: ${typeDisplay}${step.next ? ` → ${step.next}` : ''}</div>
                           <div class="actions">
                               <button class="btn btn-secondary btn-sm" data-action="edit" title="Edit step"><svg width="14" height="14" viewBox="0 0 640 640" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M100.4 417.2C104.5 402.6 112.2 389.3 123 378.5L304.2 197.3L338.1 163.4C354.7 180 389.4 214.7 442.1 267.4L476 301.3L442.1 335.2L260.9 516.4C250.2 527.1 236.8 534.9 222.2 539L94.4 574.6C86.1 576.9 77.1 574.6 71 568.4C64.9 562.2 62.6 553.3 64.9 545L100.4 417.2zM156 413.5C151.6 418.2 148.4 423.9 146.7 430.1L122.6 517L209.5 492.9C215.9 491.1 221.7 487.8 226.5 483.2L155.9 413.5zM510 267.4C493.4 250.8 458.7 216.1 406 163.4L372 129.5C398.5 103 413.4 88.1 416.9 84.6C430.4 71 448.8 63.4 468 63.4C487.2 63.4 505.6 71 519.1 84.6L554.8 120.3C568.4 133.9 576 152.3 576 171.4C576 190.5 568.4 209 554.8 222.5C551.3 226 536.4 240.9 509.9 267.4z"/></svg></button>
                               <button class="btn btn-danger btn-sm" data-action="delete" title="Delete step"><svg width="14" height="14" viewBox="0 0 448 512" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M136.7 5.9C141.1-7.2 153.3-16 167.1-16l113.9 0c13.8 0 26 8.8 30.4 21.9L320 32 416 32c17.7 0 32 14.3 32 32s-14.3 32-32 32L32 96C14.3 96 0 81.7 0 64S14.3 32 32 32l96 0 8.7-26.1zM32 144l384 0 0 304c0 35.3-28.7 64-64 64L96 512c-35.3 0-64-28.7-64-64l0-304zm88 64c-13.3 0-24 10.7-24 24l0 192c0 13.3 10.7 24 24 24s24-10.7 24-24l0-192c0-13.3-10.7-24-24-24zm104 0c-13.3 0-24 10.7-24 24l0 192c0 13.3 10.7 24 24 24s24-10.7 24-24l0-192c0-13.3-10.7-24-24-24zm104 0c-13.3 0-24 10.7-24 24l0 192c0 13.3 10.7 24 24 24s24-10.7 24-24l0-192c0-13.3-10.7-24-24-24z"/></svg></button>
                           </div>
-                      `);
+                        `));
 
         card
           .querySelector('[data-action="edit"]')
@@ -5044,7 +5067,10 @@ for (const lang in extraTranslations) {
 
       // Populate next step selector with auto-suggestion
       const nextSel = document.getElementById('step-next-select');
-      nextSel.innerHTML = translator.replaceHTML('<option value="">(end)</option>');
+      const endOption = document.createElement('option');
+      endOption.value = '';
+      endOption.textContent = translator.translate('(end)');
+      nextSel.replaceChildren(endOption);
       const currentIndex = chain.steps.findIndex((s) => s.id === step.id);
 
       chain.steps.forEach((s, index) => {
@@ -5752,7 +5778,10 @@ for (const lang in extraTranslations) {
       const fill = (id, map) => {
         const sel = document.getElementById(id);
         if (!sel) return;
-        sel.innerHTML = translator.replaceHTML('<option value="">Select preset...</option>');
+        const defaultOpt = document.createElement('option');
+        defaultOpt.value = '';
+        defaultOpt.textContent = translator.translate('Select preset...');
+        sel.replaceChildren(defaultOpt);
         Object.keys(map || {})
           .sort()
           .forEach((name) => {
