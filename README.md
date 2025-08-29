@@ -19,26 +19,27 @@ Automate ChatGPT in your browser. Type → send → wait → run your code. Batc
 
 ---
 
-## Install
 
-1. Install Tampermonkey.
-2. Open the raw script URL and install: `<userscript_raw_url/>`.
-3. Go to chat.openai.com (or chatgpt.com) → click **Automation** in the header.
+1) Install Tampermonkey
+2) Open the raw script URL and accept install:
+   - https://raw.githubusercontent.com/HRussellZFAC023/ChatGptAutomator/main/chatgptAutomation.js
+3) Go to chatgpt.com → click “Automation” in the header
 
-**Quick verify**
+## What it does
+- Types and sends your message automatically
+- Waits for ChatGPT to finish, then runs your JavaScript
+- Batch mode with templates: {item.foo}, {{index}}, nested paths
+- Polished panel: tabs, progress, logs, dark mode, saved position
+- CORS-safe HTTP helper to call any API from your code
+- Auto-detects your ChatGPT interface language via `<html lang>` and applies built-in translations to the automation panel (supports 30 languages: Albanian, Amharic, Arabic, Armenian, Bengali, Bosnian, Bulgarian, Burmese, Catalan, Chinese, Croatian, Czech, Danish, Dutch, Estonian, Finnish, French, Georgian, German, Greek, Gujarati, Hindi, Hungarian, Icelandic, Indonesian, Italian, Japanese, Kannada, Kazakh, Korean). All strings are bundled locally—no external translation services.
+- Every panel label, help tip, and log message is translated, so the interface is fully localized in your language of choice.
 
-1. Click **Automation**.
-2. Dynamic Elements: `["London","Paris","Tokyo"]`
-3. Chain JSON:
+## Quick start
+1) Simple tab: paste a message → Send
+2) Template tab: add Dynamic Elements (JSON array) and a message template → Send
+3) Response (JS) tab: paste code that runs after the reply
 
-```json
-{
-  "entryId": "step1",
-  "steps": [
-    { "id": "step1", "type": "prompt", "template": "Tell me 1 fun fact about {item}" }
-  ]
-}
-```
+Context available to your JS: response, log, console, item, index, total, http
 
 4. Run. Watch it process all cities.
 
