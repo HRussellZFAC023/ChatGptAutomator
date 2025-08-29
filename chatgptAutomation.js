@@ -50,6 +50,7 @@
     chainDefinition: null,
     runLockId: null,
     runLockTimer: null,
+    userLanguage: 'en',
   };
 
   const STORAGE_KEYS = {
@@ -101,7 +102,8 @@
       const datePart = now.toLocaleDateString(undefined, { day: '2-digit', month: 'short' });
       const timePart = now.toLocaleTimeString();
       const timestamp = `${datePart} ${timePart}`;
-      const logMessage = `[${timestamp}] ${message}`;
+      const translated = translator.translate(message);
+      const logMessage = `[${timestamp}] ${translated}`;
 
       if (CONFIG.DEBUG_MODE) console.log(logMessage);
 
@@ -152,6 +154,21 @@
           getComputedStyle(body).backgroundColor.includes('rgb(17, 24, 39)') ||
           getComputedStyle(body).backgroundColor.includes('rgb(31, 41, 55)'),
       ].some(Boolean);
+    },
+
+    detectUserLanguage: () => {
+      try {
+        const langAttr = (
+          document.documentElement.getAttribute('lang') ||
+          navigator.language ||
+          'en'
+        ).toLowerCase();
+        state.userLanguage = langAttr.split('-')[0];
+        return state.userLanguage;
+      } catch {
+        state.userLanguage = 'en';
+        return 'en';
+      }
     },
 
     saveToStorage: (key, value) => {
@@ -239,6 +256,631 @@
     },
     postMultipart: (url, formObj, extraHeaders = {}) => {
       return http.postForm(url, formObj, extraHeaders);
+    },
+  };
+
+    const translations = {
+    sq: {
+      'Automation': 'Automatizim',
+      'Open Automation': 'Hap Automatizimin',
+      'Batch progress': 'Përparimi i grupit',
+      'Inner batch progress': 'Përparimi i brendshëm i grupit',
+      'Ready': 'Gati',
+      'Show/Hide Log': 'Shfaq/Fshih Regjistrin',
+      'Minimize': 'Minimizo',
+      'Close': 'Mbyll',
+      'Composer': 'Kompozitor',
+      'Settings': 'Cilësimet',
+      'Composer Canvas:': 'Kanavaca e Kompozitorit',
+      'Preset name': 'Emri i paracaktuar',
+      'Select preset...': 'Zgjidh një paracaktim...',
+      'Message': 'Mesazh',
+      'Send': 'Dërgo',
+      'Template': 'Model',
+      'Dynamic Elements': 'Elemente dinamike',
+      'Response (JS)': 'Përgjigje (JS)',
+    },
+    am: {
+      'Automation': 'አውቶሜሽን',
+      'Open Automation': 'አውቶሜሽን ክፈት',
+      'Batch progress': 'የቡድን እድገት',
+      'Inner batch progress': 'የውስጥ ቡድን እድገት',
+      'Ready': 'ዝግጁ',
+      'Show/Hide Log': 'መዝገብ አሳይ/ደብቅ',
+      'Minimize': 'ቀንስ',
+      'Close': 'ዝጋ',
+      'Composer': 'ደራሲ',
+      'Settings': 'ቅንብሮች',
+      'Composer Canvas:': 'የደራሲ ካንቫስ',
+      'Preset name': 'የቀድሞ ስም',
+      'Select preset...': 'ቀድሞ የተዘጋጀውን ምረጥ...',
+      'Message': 'መልእክት',
+      'Send': 'ላክ',
+      'Template': 'አብነት',
+      'Dynamic Elements': 'ተለዋዋጭ ንጥሎች',
+      'Response (JS)': 'ምላሽ (JS)',
+    },
+    ar: {
+      'Automation': 'أتمتة',
+      'Open Automation': 'افتح الأتمتة',
+      'Batch progress': 'تقدم الدفعة',
+      'Inner batch progress': 'تقدم الدفعة الداخلية',
+      'Ready': 'جاهز',
+      'Show/Hide Log': 'إظهار/إخفاء السجل',
+      'Minimize': 'تصغير',
+      'Close': 'إغلاق',
+      'Composer': 'المؤلف',
+      'Settings': 'الإعدادات',
+      'Composer Canvas:': 'لوحة المؤلف',
+      'Preset name': 'اسم الإعداد المسبق',
+      'Select preset...': 'اختر إعداداً مسبقاً...',
+      'Message': 'رسالة',
+      'Send': 'إرسال',
+      'Template': 'قالب',
+      'Dynamic Elements': 'عناصر ديناميكية',
+      'Response (JS)': 'الاستجابة (JS)',
+    },
+    hy: {
+      'Automation': 'Ավտոմատացում',
+      'Open Automation': 'Բացել ավտոմատացումը',
+      'Batch progress': 'Խմբաքանակի առաջընթաց',
+      'Inner batch progress': 'Ներքին խմբաքանակի առաջընթաց',
+      'Ready': 'Պատրաստ',
+      'Show/Hide Log': 'Ցույց տալ/Թաքցնել մատյանը',
+      'Minimize': 'Մանրացնել',
+      'Close': 'Փակել',
+      'Composer': 'Կոմպոզիտոր',
+      'Settings': 'Կարգավորումներ',
+      'Composer Canvas:': 'Կոմպոզիտորի կտավ',
+      'Preset name': 'Նախապես սահմանված անուն',
+      'Select preset...': 'Ընտրել նախադրվածը...',
+      'Message': 'Հաղորդագրություն',
+      'Send': 'Ուղարկել',
+      'Template': 'Կաղապար',
+      'Dynamic Elements': 'Դինամիկ տարրեր',
+      'Response (JS)': 'Պատասխան (JS)',
+    },
+    bn: {
+      'Automation': 'স্বয়ংক্রিয়করণ',
+      'Open Automation': 'স্বয়ংক্রিয়করণ খুলুন',
+      'Batch progress': 'ব্যাচ অগ্রগতি',
+      'Inner batch progress': 'অভ্যন্তরীণ ব্যাচ অগ্রগতি',
+      'Ready': 'প্রস্তুত',
+      'Show/Hide Log': 'লগ দেখান/লুকান',
+      'Minimize': 'ছোট করুন',
+      'Close': 'বন্ধ করুন',
+      'Composer': 'কম্পোজার',
+      'Settings': 'সেটিংস',
+      'Composer Canvas:': 'কম্পোজার ক্যানভাস',
+      'Preset name': 'প্রিসেট নাম',
+      'Select preset...': 'প্রিসেট নির্বাচন করুন...',
+      'Message': 'বার্তা',
+      'Send': 'পাঠান',
+      'Template': 'টেমপ্লেট',
+      'Dynamic Elements': 'গতিশীল উপাদান',
+      'Response (JS)': 'প্রতিক্রিয়া (JS)',
+    },
+    bs: {
+      'Automation': 'Automatizacija',
+      'Open Automation': 'Otvori automatizaciju',
+      'Batch progress': 'Napredak serije',
+      'Inner batch progress': 'Unutarnji napredak serije',
+      'Ready': 'Spremno',
+      'Show/Hide Log': 'Prikaži/Sakrij dnevnik',
+      'Minimize': 'Smanji',
+      'Close': 'Zatvori',
+      'Composer': 'Sastavljač',
+      'Settings': 'Postavke',
+      'Composer Canvas:': 'Platno sastavljača',
+      'Preset name': 'Naziv preseta',
+      'Select preset...': 'Odaberi preset...',
+      'Message': 'Poruka',
+      'Send': 'Pošalji',
+      'Template': 'Predložak',
+      'Dynamic Elements': 'Dinamički elementi',
+      'Response (JS)': 'Odgovor (JS)',
+    },
+    bg: {
+      'Automation': 'Автоматизация',
+      'Open Automation': 'Отвори автоматизацията',
+      'Batch progress': 'Напредък на партидата',
+      'Inner batch progress': 'Вътрешен напредък на партидата',
+      'Ready': 'Готово',
+      'Show/Hide Log': 'Покажи/Скрий дневника',
+      'Minimize': 'Минимизирай',
+      'Close': 'Затвори',
+      'Composer': 'Композитор',
+      'Settings': 'Настройки',
+      'Composer Canvas:': 'Платно на композитора',
+      'Preset name': 'Име на пресет',
+      'Select preset...': 'Изберете пресет...',
+      'Message': 'Съобщение',
+      'Send': 'Изпрати',
+      'Template': 'Шаблон',
+      'Dynamic Elements': 'Динамични елементи',
+      'Response (JS)': 'Отговор (JS)',
+    },
+    my: {
+      'Automation': 'အလိုအလျောက်လုပ်ငန်း',
+      'Open Automation': 'အလိုအလျောက်စနစ်ကို ဖွင့်ပါ',
+      'Batch progress': 'အစုလိုက် တိုးတက်မှု',
+      'Inner batch progress': 'အတွင်းပိုင်း အစုလိုက် တိုးတက်မှု',
+      'Ready': 'ပြင်ဆင်ပြီး',
+      'Show/Hide Log': 'မှတ်တမ်း ပြ/ဖျောက်',
+      'Minimize': 'သေးစေ',
+      'Close': 'ပိတ်',
+      'Composer': 'ရေးသားသူ',
+      'Settings': 'ဆက်တင်များ',
+      'Composer Canvas:': 'ရေးသားသူ ကန်ဗတ်',
+      'Preset name': 'ကြိုသတ်မှတ်ထားသော နာမည်',
+      'Select preset...': 'ကြိုသတ်မှတ်ထားသောကို ရွေးပါ...',
+      'Message': 'မက်ဆေ့ခ်ျ',
+      'Send': 'ပို့',
+      'Template': 'ပုံစံ',
+      'Dynamic Elements': 'ဒိုင်နမစ် အရာဝတ္ထုများ',
+      'Response (JS)': 'တုံ့ပြန်ချက် (JS)',
+    },
+    ca: {
+      'Automation': 'Automatització',
+      'Open Automation': 'Obre l\'automatització',
+      'Batch progress': 'Progrés del lot',
+      'Inner batch progress': 'Progrés intern del lot',
+      'Ready': 'Preparat',
+      'Show/Hide Log': 'Mostra/Amaga el registre',
+      'Minimize': 'Minimitza',
+      'Close': 'Tanca',
+      'Composer': 'Compositor',
+      'Settings': 'Configuració',
+      'Composer Canvas:': 'Canvas del compositor',
+      'Preset name': 'Nom del preset',
+      'Select preset...': 'Selecciona un preset...',
+      'Message': 'Missatge',
+      'Send': 'Envia',
+      'Template': 'Plantilla',
+      'Dynamic Elements': 'Elements dinàmics',
+      'Response (JS)': 'Resposta (JS)',
+    },
+    zh: {
+      'Automation': '自动化',
+      'Open Automation': '打开自动化',
+      'Batch progress': '批处理进度',
+      'Inner batch progress': '内部批处理进度',
+      'Ready': '准备就绪',
+      'Show/Hide Log': '显示/隐藏日志',
+      'Minimize': '最小化',
+      'Close': '关闭',
+      'Composer': '编辑器',
+      'Settings': '设置',
+      'Composer Canvas:': '编辑器画布',
+      'Preset name': '预设名称',
+      'Select preset...': '选择预设...',
+      'Message': '消息',
+      'Send': '发送',
+      'Template': '模板',
+      'Dynamic Elements': '动态元素',
+      'Response (JS)': '响应 (JS)',
+    },
+    hr: {
+      'Automation': 'Automatizacija',
+      'Open Automation': 'Otvori automatizaciju',
+      'Batch progress': 'Napredak serije',
+      'Inner batch progress': 'Unutarnji napredak serije',
+      'Ready': 'Spremno',
+      'Show/Hide Log': 'Prikaži/Sakrij zapisnik',
+      'Minimize': 'Smanji',
+      'Close': 'Zatvori',
+      'Composer': 'Sastavljač',
+      'Settings': 'Postavke',
+      'Composer Canvas:': 'Platno sastavljača',
+      'Preset name': 'Naziv preseta',
+      'Select preset...': 'Odaberi preset...',
+      'Message': 'Poruka',
+      'Send': 'Pošalji',
+      'Template': 'Predložak',
+      'Dynamic Elements': 'Dinamički elementi',
+      'Response (JS)': 'Odgovor (JS)',
+    },
+    cs: {
+      'Automation': 'Automatizace',
+      'Open Automation': 'Otevřít automatizaci',
+      'Batch progress': 'Postup dávky',
+      'Inner batch progress': 'Vnitřní postup dávky',
+      'Ready': 'Připraveno',
+      'Show/Hide Log': 'Zobrazit/Skrýt protokol',
+      'Minimize': 'Minimalizovat',
+      'Close': 'Zavřít',
+      'Composer': 'Editor',
+      'Settings': 'Nastavení',
+      'Composer Canvas:': 'Plátno editoru',
+      'Preset name': 'Název presetu',
+      'Select preset...': 'Vyberte preset...',
+      'Message': 'Zpráva',
+      'Send': 'Odeslat',
+      'Template': 'Šablona',
+      'Dynamic Elements': 'Dynamické prvky',
+      'Response (JS)': 'Odezva (JS)',
+    },
+    da: {
+      'Automation': 'Automatisering',
+      'Open Automation': 'Åbn automatisering',
+      'Batch progress': 'Batchfremskridt',
+      'Inner batch progress': 'Indre batchfremskridt',
+      'Ready': 'Klar',
+      'Show/Hide Log': 'Vis/Skjul log',
+      'Minimize': 'Minimer',
+      'Close': 'Luk',
+      'Composer': 'Komponist',
+      'Settings': 'Indstillinger',
+      'Composer Canvas:': 'Komponistlærred',
+      'Preset name': 'Preset-navn',
+      'Select preset...': 'Vælg preset...',
+      'Message': 'Besked',
+      'Send': 'Send',
+      'Template': 'Skabelon',
+      'Dynamic Elements': 'Dynamiske elementer',
+      'Response (JS)': 'Svar (JS)',
+    },
+    nl: {
+      'Automation': 'Automatisering',
+      'Open Automation': 'Automatisering openen',
+      'Batch progress': 'Batchvoortgang',
+      'Inner batch progress': 'Interne batchvoortgang',
+      'Ready': 'Klaar',
+      'Show/Hide Log': 'Logboek tonen/verbergen',
+      'Minimize': 'Minimaliseren',
+      'Close': 'Sluiten',
+      'Composer': 'Componist',
+      'Settings': 'Instellingen',
+      'Composer Canvas:': 'Componistcanvas',
+      'Preset name': 'Voorinstelling naam',
+      'Select preset...': 'Selecteer voorinstelling...',
+      'Message': 'Bericht',
+      'Send': 'Verzenden',
+      'Template': 'Sjabloon',
+      'Dynamic Elements': 'Dynamische elementen',
+      'Response (JS)': 'Reactie (JS)',
+    },
+    et: {
+      'Automation': 'Automaatika',
+      'Open Automation': 'Ava automaatika',
+      'Batch progress': 'Partii edenemine',
+      'Inner batch progress': 'Sisemise partii edenemine',
+      'Ready': 'Valmis',
+      'Show/Hide Log': 'Näita/Peida logi',
+      'Minimize': 'Minimeeri',
+      'Close': 'Sulge',
+      'Composer': 'Koostaja',
+      'Settings': 'Seaded',
+      'Composer Canvas:': 'Koostaja lõuend',
+      'Preset name': 'Eelseadistuse nimi',
+      'Select preset...': 'Vali eelseadistus...',
+      'Message': 'Sõnum',
+      'Send': 'Saada',
+      'Template': 'Mall',
+      'Dynamic Elements': 'Dünaamilised elemendid',
+      'Response (JS)': 'Vastus (JS)',
+    },
+    fi: {
+      'Automation': 'Automaatio',
+      'Open Automation': 'Avaa automaatio',
+      'Batch progress': 'Erän edistyminen',
+      'Inner batch progress': 'Sisäisen erän edistyminen',
+      'Ready': 'Valmis',
+      'Show/Hide Log': 'Näytä/Piilota loki',
+      'Minimize': 'Pienennä',
+      'Close': 'Sulje',
+      'Composer': 'Koostin',
+      'Settings': 'Asetukset',
+      'Composer Canvas:': 'Koostimen kanvaasi',
+      'Preset name': 'Esiasetuksen nimi',
+      'Select preset...': 'Valitse esiasetus...',
+      'Message': 'Viesti',
+      'Send': 'Lähetä',
+      'Template': 'Malli',
+      'Dynamic Elements': 'Dynaamiset elementit',
+      'Response (JS)': 'Vastaus (JS)',
+    },
+    fr: {
+      'Automation': 'Automatisation',
+      'Open Automation': 'Ouvrir l\'automatisation',
+      'Batch progress': 'Progression du lot',
+      'Inner batch progress': 'Progression interne du lot',
+      'Ready': 'Prêt',
+      'Show/Hide Log': 'Afficher/Masquer le journal',
+      'Minimize': 'Minimiser',
+      'Close': 'Fermer',
+      'Composer': 'Compositeur',
+      'Settings': 'Paramètres',
+      'Composer Canvas:': 'Toile du compositeur',
+      'Preset name': 'Nom du preset',
+      'Select preset...': 'Sélectionner un preset...',
+      'Message': 'Message',
+      'Send': 'Envoyer',
+      'Template': 'Modèle',
+      'Dynamic Elements': 'Éléments dynamiques',
+      'Response (JS)': 'Réponse (JS)',
+    },
+    ka: {
+      'Automation': 'ავტომატიზაცია',
+      'Open Automation': 'გახსენი ავტომატიზაცია',
+      'Batch progress': 'პაკეტის პროგრესი',
+      'Inner batch progress': 'შიდა პაკეტის პროგრესი',
+      'Ready': 'მზადაა',
+      'Show/Hide Log': 'ლოგის ჩვენება/დამალვა',
+      'Minimize': 'მინიმიზაცია',
+      'Close': 'დახურვა',
+      'Composer': 'კომპოზიტორი',
+      'Settings': 'პარამეტრები',
+      'Composer Canvas:': 'კომპოზიტორის ქანვასი',
+      'Preset name': 'წინასწარი სახელწოდება',
+      'Select preset...': 'აირჩიე პრესეტი...',
+      'Message': 'შეტყობინება',
+      'Send': 'გაგზავნა',
+      'Template': 'შაბლონი',
+      'Dynamic Elements': 'დინამიკური ელემენტები',
+      'Response (JS)': 'პასუხი (JS)',
+    },
+    de: {
+      'Automation': 'Automatisierung',
+      'Open Automation': 'Automatisierung öffnen',
+      'Batch progress': 'Stapelfortschritt',
+      'Inner batch progress': 'Innerer Stapelfortschritt',
+      'Ready': 'Bereit',
+      'Show/Hide Log': 'Protokoll anzeigen/ausblenden',
+      'Minimize': 'Minimieren',
+      'Close': 'Schließen',
+      'Composer': 'Komponist',
+      'Settings': 'Einstellungen',
+      'Composer Canvas:': 'Komponisten-Leinwand',
+      'Preset name': 'Preset-Name',
+      'Select preset...': 'Preset auswählen...',
+      'Message': 'Nachricht',
+      'Send': 'Senden',
+      'Template': 'Vorlage',
+      'Dynamic Elements': 'Dynamische Elemente',
+      'Response (JS)': 'Antwort (JS)',
+    },
+    el: {
+      'Automation': 'Αυτοματοποίηση',
+      'Open Automation': 'Άνοιγμα αυτοματοποίησης',
+      'Batch progress': 'Πρόοδος παρτίδας',
+      'Inner batch progress': 'Εσωτερική πρόοδος παρτίδας',
+      'Ready': 'Έτοιμο',
+      'Show/Hide Log': 'Εμφάνιση/Απόκρυψη καταγραφής',
+      'Minimize': 'Ελαχιστοποίηση',
+      'Close': 'Κλείσιμο',
+      'Composer': 'Συνθέτης',
+      'Settings': 'Ρυθμίσεις',
+      'Composer Canvas:': 'Καμβάς συνθέτη',
+      'Preset name': 'Όνομα προεπιλογής',
+      'Select preset...': 'Επιλογή προεπιλογής...',
+      'Message': 'Μήνυμα',
+      'Send': 'Αποστολή',
+      'Template': 'Πρότυπο',
+      'Dynamic Elements': 'Δυναμικά στοιχεία',
+      'Response (JS)': 'Απόκριση (JS)',
+    },
+    gu: {
+      'Automation': 'સ્વચાલન',
+      'Open Automation': 'સ્વચાલન ખોલો',
+      'Batch progress': 'બેચ પ્રગતિ',
+      'Inner batch progress': 'આંતરિક બેચ પ્રગતિ',
+      'Ready': 'તૈયાર',
+      'Show/Hide Log': 'લોગ બતાવો/છુપાવો',
+      'Minimize': 'ન્યૂનતમ કરો',
+      'Close': 'બંધ કરો',
+      'Composer': 'રચયિતા',
+      'Settings': 'સેટિંગ્સ',
+      'Composer Canvas:': 'રચયિતાનું કેનવાસ',
+      'Preset name': 'પ્રિસેટ નામ',
+      'Select preset...': 'પ્રિસેટ પસંદ કરો...',
+      'Message': 'સંદેશ',
+      'Send': 'મોકલો',
+      'Template': 'ટેમ્પલેટ',
+      'Dynamic Elements': 'ગતિશીલ ઘટકો',
+      'Response (JS)': 'પ્રતિસાદ (JS)',
+    },
+    hi: {
+      'Automation': 'स्वचालन',
+      'Open Automation': 'स्वचालन खोलें',
+      'Batch progress': 'बैच प्रगति',
+      'Inner batch progress': 'आंतरिक बैच प्रगति',
+      'Ready': 'तैयार',
+      'Show/Hide Log': 'लॉग दिखाएँ/छुपाएँ',
+      'Minimize': 'छोटा करें',
+      'Close': 'बंद करें',
+      'Composer': 'रचनाकार',
+      'Settings': 'सेटिंग्स',
+      'Composer Canvas:': 'रचनाकार कैनवास',
+      'Preset name': 'पूर्वनिर्धारित नाम',
+      'Select preset...': 'पूर्वनिर्धारित चुनें...',
+      'Message': 'संदेश',
+      'Send': 'भेजें',
+      'Template': 'टेम्पलेट',
+      'Dynamic Elements': 'गतिशील तत्व',
+      'Response (JS)': 'प्रतिक्रिया (JS)',
+    },
+    hu: {
+      'Automation': 'Automatizálás',
+      'Open Automation': 'Automatizálás megnyitása',
+      'Batch progress': 'Köteg előrehaladás',
+      'Inner batch progress': 'Belső köteg előrehaladás',
+      'Ready': 'Kész',
+      'Show/Hide Log': 'Napló megjelenítése/elrejtése',
+      'Minimize': 'Minimalizálás',
+      'Close': 'Bezárás',
+      'Composer': 'Komponista',
+      'Settings': 'Beállítások',
+      'Composer Canvas:': 'Komponista vászon',
+      'Preset name': 'Előbeállítás neve',
+      'Select preset...': 'Előbeállítás kiválasztása...',
+      'Message': 'Üzenet',
+      'Send': 'Küldés',
+      'Template': 'Sablon',
+      'Dynamic Elements': 'Dinamikus elemek',
+      'Response (JS)': 'Válasz (JS)',
+    },
+    is: {
+      'Automation': 'Sjálfvirkni',
+      'Open Automation': 'Opna sjálfvirkni',
+      'Batch progress': 'Lotuframvinda',
+      'Inner batch progress': 'Innri lotuframvinda',
+      'Ready': 'Tilbúið',
+      'Show/Hide Log': 'Sýna/Fela atvikaskrá',
+      'Minimize': 'Lágmarka',
+      'Close': 'Loka',
+      'Composer': 'Tónskáld',
+      'Settings': 'Stillingar',
+      'Composer Canvas:': 'Tónskáld striga',
+      'Preset name': 'Forstillt nafn',
+      'Select preset...': 'Veldu forstillingu...',
+      'Message': 'Skilaboð',
+      'Send': 'Senda',
+      'Template': 'Sniðmát',
+      'Dynamic Elements': 'Breytilegir þættir',
+      'Response (JS)': 'Svar (JS)',
+    },
+    id: {
+      'Automation': 'Otomatisasi',
+      'Open Automation': 'Buka Otomatisasi',
+      'Batch progress': 'Kemajuan batch',
+      'Inner batch progress': 'Kemajuan batch internal',
+      'Ready': 'Siap',
+      'Show/Hide Log': 'Tampilkan/Sembunyikan Log',
+      'Minimize': 'Minimalkan',
+      'Close': 'Tutup',
+      'Composer': 'Penyusun',
+      'Settings': 'Pengaturan',
+      'Composer Canvas:': 'Kanvas penyusun',
+      'Preset name': 'Nama preset',
+      'Select preset...': 'Pilih preset...',
+      'Message': 'Pesan',
+      'Send': 'Kirim',
+      'Template': 'Templat',
+      'Dynamic Elements': 'Elemen dinamis',
+      'Response (JS)': 'Respons (JS)',
+    },
+    it: {
+      'Automation': 'Automazione',
+      'Open Automation': 'Apri automazione',
+      'Batch progress': 'Avanzamento batch',
+      'Inner batch progress': 'Avanzamento batch interno',
+      'Ready': 'Pronto',
+      'Show/Hide Log': 'Mostra/Nascondi registro',
+      'Minimize': 'Riduci',
+      'Close': 'Chiudi',
+      'Composer': 'Compositore',
+      'Settings': 'Impostazioni',
+      'Composer Canvas:': 'Tela del compositore',
+      'Preset name': 'Nome preset',
+      'Select preset...': 'Seleziona preset...',
+      'Message': 'Messaggio',
+      'Send': 'Invia',
+      'Template': 'Modello',
+      'Dynamic Elements': 'Elementi dinamici',
+      'Response (JS)': 'Risposta (JS)',
+    },
+    ja: {
+      'Automation': '自動化',
+      'Open Automation': '自動化を開く',
+      'Batch progress': 'バッチ進行',
+      'Inner batch progress': '内部バッチ進行',
+      'Ready': '準備完了',
+      'Show/Hide Log': 'ログを表示/非表示',
+      'Minimize': '最小化',
+      'Close': '閉じる',
+      'Composer': 'コンポーザー',
+      'Settings': '設定',
+      'Composer Canvas:': 'コンポーザーキャンバス',
+      'Preset name': 'プリセット名',
+      'Select preset...': 'プリセットを選択...',
+      'Message': 'メッセージ',
+      'Send': '送信',
+      'Template': 'テンプレート',
+      'Dynamic Elements': '動的要素',
+      'Response (JS)': 'レスポンス (JS)',
+    },
+    kn: {
+      'Automation': 'ಸ್ವಯಂಚಾಲಿತ',
+      'Open Automation': 'ಸ್ವಯಂಚಾಲಿತ ತೆರೆಯಿರಿ',
+      'Batch progress': 'ಬ್ಯಾಚ್ ಪ್ರಗತಿ',
+      'Inner batch progress': 'ಅಂತರಂಗ ಬ್ಯಾಚ್ ಪ್ರಗತಿ',
+      'Ready': 'ಸಿದ್ಧ',
+      'Show/Hide Log': 'ಲಾಗ್ ತೋರಿಸಿ/ಮರೆಮಾಚಿ',
+      'Minimize': 'ಕಡಿಮೆ ಮಾಡಿ',
+      'Close': 'ಮುಚ್ಚಿ',
+      'Composer': 'ರಚನೆಗಾರ',
+      'Settings': 'ಸೆಟ್ಟಿಂಗ್ಸ್',
+      'Composer Canvas:': 'ರಚನೆಗಾರ ಕ್ಯಾನ್ವಾಸ್',
+      'Preset name': 'ಪೂರ್ವನಿಯೋಜಿತ ಹೆಸರು',
+      'Select preset...': 'ಪೂರ್ವನಿಯೋಜಿತ ಆಯ್ಕೆಮಾಡಿ...',
+      'Message': 'ಸಂದೇಶ',
+      'Send': 'ಕಳುಹಿಸಿ',
+      'Template': 'ಟೆಂಪ್ಲೇಟ್',
+      'Dynamic Elements': 'ಗತಿಶೀಲ ಘಟಕಗಳು',
+      'Response (JS)': 'ಪ್ರತಿಕ್ರಿಯೆ (JS)',
+    },
+    kk: {
+      'Automation': 'Автоматтандыру',
+      'Open Automation': 'Автоматтандыруды ашу',
+      'Batch progress': 'Топтаманың барысы',
+      'Inner batch progress': 'Ішкі топтаманың барысы',
+      'Ready': 'Дайын',
+      'Show/Hide Log': 'Журналды көрсету/жасыру',
+      'Minimize': 'Төмендету',
+      'Close': 'Жабу',
+      'Composer': 'Композитор',
+      'Settings': 'Баптаулар',
+      'Composer Canvas:': 'Композитор кенебі',
+      'Preset name': 'Алдын ала орнату атауы',
+      'Select preset...': 'Алдын ала орнатуды таңдаңыз...',
+      'Message': 'Хабарлама',
+      'Send': 'Жіберу',
+      'Template': 'Үлгі',
+      'Dynamic Elements': 'Динамикалық элементтер',
+      'Response (JS)': 'Жауап (JS)',
+    },
+    ko: {
+      'Automation': '자동화',
+      'Open Automation': '자동화 열기',
+      'Batch progress': '배치 진행',
+      'Inner batch progress': '내부 배치 진행',
+      'Ready': '준비 완료',
+      'Show/Hide Log': '로그 표시/숨기기',
+      'Minimize': '최소화',
+      'Close': '닫기',
+      'Composer': '작성기',
+      'Settings': '설정',
+      'Composer Canvas:': '작성기 캔버스',
+      'Preset name': '프리셋 이름',
+      'Select preset...': '프리셋 선택...',
+      'Message': '메시지',
+      'Send': '보내기',
+      'Template': '템플릿',
+      'Dynamic Elements': '동적 요소',
+      'Response (JS)': '응답 (JS)',
+    },
+  };
+
+  const translator = {
+    instant(text) {
+      const lang = state.userLanguage;
+      if (lang === 'en' || !text || !text.trim()) return text;
+      return translations[lang]?.[text] || text;
+    },
+    translate(text) {
+      return translator.instant(text);
+    },
+    replaceHTML(html) {
+      const lang = state.userLanguage;
+      if (lang === 'en') return html;
+      const dict = translations[lang];
+      if (!dict) return html;
+      const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      return Object.entries(dict).reduce((acc, [en, loc]) => {
+        const re = new RegExp(esc(en), 'g');
+        return acc.replace(re, loc);
+      }, html);
     },
   };
 
@@ -586,7 +1228,7 @@
     ui.mainContainer = document.createElement('div');
     ui.mainContainer.id = 'chatgpt-automation-ui';
     ui.mainContainer.className = state.isDarkMode ? 'dark-mode' : 'light-mode';
-    ui.mainContainer.innerHTML = /*html*/ `<div class="automation-header" id="automation-header">
+    ui.mainContainer.innerHTML = translator.replaceHTML(/*html*/ `<div class="automation-header" id="automation-header">
     <h3>ChatGPT Automation Pro</h3>
     <div class="header-controls">
       <div
@@ -1120,7 +1762,7 @@
       </div>
     </div>
   </div>
-  `;
+  `);
 
     // Add styles with ChatGPT-inspired design (guard against duplicates)
     let style = document.getElementById('chatgpt-automation-style');
@@ -2159,10 +2801,11 @@
     const btn = document.createElement('button');
     btn.id = 'chatgpt-automation-launcher';
     btn.type = 'button';
-    btn.title = 'Open Automation';
-    btn.setAttribute('aria-label', 'Open Automation');
+    const label = translator.instant('Open Automation');
+    btn.title = label;
+    btn.setAttribute('aria-label', label);
     btn.className = 'btn relative btn-ghost text-token-text-primary';
-    btn.innerHTML = `<div class="flex w-full items-center justify-center gap-1.5"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640" width="20" height="20" fill="currentColor" class="icon"><path d="M273 151.1L288 171.8L303 151.1C328 116.5 368.2 96 410.9 96C484.4 96 544 155.6 544 229.1L544 231.7C544 249.3 540.6 267.3 534.5 285.4C512.7 276.8 488.9 272 464 272C358 272 272 358 272 464C272 492.5 278.2 519.6 289.4 544C288.9 544 288.5 544 288 544C272.5 544 257.2 539.4 244.9 529.9C171.9 474.2 32 343.9 32 231.7L32 229.1C32 155.6 91.6 96 165.1 96C207.8 96 248 116.5 273 151.1zM320 464C320 384.5 384.5 320 464 320C543.5 320 608 384.5 608 464C608 543.5 543.5 608 464 608C384.5 608 320 543.5 320 464zM497.4 387C491.6 382.8 483.6 383 478 387.5L398 451.5C392.7 455.7 390.6 462.9 392.9 469.3C395.2 475.7 401.2 480 408 480L440.9 480L425 522.4C422.5 529.1 424.8 536.7 430.6 541C436.4 545.3 444.4 545 450 540.5L530 476.5C535.3 472.3 537.4 465.1 535.1 458.7C532.8 452.3 526.8 448 520 448L487.1 448L503 405.6C505.5 398.9 503.2 391.3 497.4 387z"/></svg><span class="max-md:hidden">Automation</span></div>`;
+    btn.innerHTML = translator.replaceHTML(`<div class="flex w-full items-center justify-center gap-1.5"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640" width="20" height="20" fill="currentColor" class="icon"><path d="M273 151.1L288 171.8L303 151.1C328 116.5 368.2 96 410.9 96C484.4 96 544 155.6 544 229.1L544 231.7C544 249.3 540.6 267.3 534.5 285.4C512.7 276.8 488.9 272 464 272C358 272 272 358 272 464C272 492.5 278.2 519.6 289.4 544C288.9 544 288.5 544 288 544C272.5 544 257.2 539.4 244.9 529.9C171.9 474.2 32 343.9 32 231.7L32 229.1C32 155.6 91.6 96 165.1 96C207.8 96 248 116.5 273 151.1zM320 464C320 384.5 384.5 320 464 320C543.5 320 608 384.5 608 464C608 543.5 543.5 608 464 608C384.5 608 320 543.5 320 464zM497.4 387C491.6 382.8 483.6 383 478 387.5L398 451.5C392.7 455.7 390.6 462.9 392.9 469.3C395.2 475.7 401.2 480 408 480L440.9 480L425 522.4C422.5 529.1 424.8 536.7 430.6 541C436.4 545.3 444.4 545 450 540.5L530 476.5C535.3 472.3 537.4 465.1 535.1 458.7C532.8 452.3 526.8 448 520 448L487.1 448L503 405.6C505.5 398.9 503.2 391.3 497.4 387z"/></svg><span class="max-md:hidden">Automation</span></div>`);
     btn.addEventListener('click', () => {
       // If UI was removed by a re-render, recreate it
       let panel = document.getElementById('chatgpt-automation-ui');
@@ -2662,14 +3305,14 @@
                   ? 'HTTP Request'
                   : step.type;
 
-        card.innerHTML = `
+        card.innerHTML = translator.replaceHTML(`
                           <div class="title">${step.title || step.id || '(untitled)'}</div>
                           <div class="meta">type: ${typeDisplay}${step.next ? ` → ${step.next}` : ''}</div>
                           <div class="actions">
                               <button class="btn btn-secondary btn-sm" data-action="edit" title="Edit step"><svg width="14" height="14" viewBox="0 0 640 640" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M100.4 417.2C104.5 402.6 112.2 389.3 123 378.5L304.2 197.3L338.1 163.4C354.7 180 389.4 214.7 442.1 267.4L476 301.3L442.1 335.2L260.9 516.4C250.2 527.1 236.8 534.9 222.2 539L94.4 574.6C86.1 576.9 77.1 574.6 71 568.4C64.9 562.2 62.6 553.3 64.9 545L100.4 417.2zM156 413.5C151.6 418.2 148.4 423.9 146.7 430.1L122.6 517L209.5 492.9C215.9 491.1 221.7 487.8 226.5 483.2L155.9 413.5zM510 267.4C493.4 250.8 458.7 216.1 406 163.4L372 129.5C398.5 103 413.4 88.1 416.9 84.6C430.4 71 448.8 63.4 468 63.4C487.2 63.4 505.6 71 519.1 84.6L554.8 120.3C568.4 133.9 576 152.3 576 171.4C576 190.5 568.4 209 554.8 222.5C551.3 226 536.4 240.9 509.9 267.4z"/></svg></button>
                               <button class="btn btn-danger btn-sm" data-action="delete" title="Delete step"><svg width="14" height="14" viewBox="0 0 448 512" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M136.7 5.9C141.1-7.2 153.3-16 167.1-16l113.9 0c13.8 0 26 8.8 30.4 21.9L320 32 416 32c17.7 0 32 14.3 32 32s-14.3 32-32 32L32 96C14.3 96 0 81.7 0 64S14.3 32 32 32l96 0 8.7-26.1zM32 144l384 0 0 304c0 35.3-28.7 64-64 64L96 512c-35.3 0-64-28.7-64-64l0-304zm88 64c-13.3 0-24 10.7-24 24l0 192c0 13.3 10.7 24 24 24s24-10.7 24-24l0-192c0-13.3-10.7-24-24-24zm104 0c-13.3 0-24 10.7-24 24l0 192c0 13.3 10.7 24 24 24s24-10.7 24-24l0-192c0-13.3-10.7-24-24-24zm104 0c-13.3 0-24 10.7-24 24l0 192c0 13.3 10.7 24 24 24s24-10.7 24-24l0-192c0-13.3-10.7-24-24-24z"/></svg></button>
                           </div>
-                      `;
+                      `);
 
         card
           .querySelector('[data-action="edit"]')
@@ -2801,7 +3444,7 @@
 
       // Populate next step selector with auto-suggestion
       const nextSel = document.getElementById('step-next-select');
-      nextSel.innerHTML = '<option value="">(end)</option>';
+      nextSel.innerHTML = translator.replaceHTML('<option value="">(end)</option>');
       const currentIndex = chain.steps.findIndex((s) => s.id === step.id);
 
       chain.steps.forEach((s, index) => {
@@ -3510,7 +4153,7 @@
       const fill = (id, map) => {
         const sel = document.getElementById(id);
         if (!sel) return;
-        sel.innerHTML = '<option value="">Select preset...</option>';
+        sel.innerHTML = translator.replaceHTML('<option value="">Select preset...</option>');
         Object.keys(map || {})
           .sort()
           .forEach((name) => {
@@ -4203,6 +4846,7 @@
       return; // Already initialized
     }
 
+    utils.detectUserLanguage();
     utils.log('Initializing ChatGPT Automation Pro...');
 
     // Wait for page to be ready
