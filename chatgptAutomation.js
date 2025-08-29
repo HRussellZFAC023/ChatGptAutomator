@@ -4905,19 +4905,42 @@ for (const lang in extraTranslations) {
                   ? 'HTTP Request'
                   : step.type;
 
-        card.innerHTML = translator.replaceHTML(`
-                          <div class="title">${step.title || step.id || '(untitled)'}</div>
-                          <div class="meta">type: ${typeDisplay}${step.next ? ` → ${step.next}` : ''}</div>
-                          <div class="actions">
-                              <button class="btn btn-secondary btn-sm" data-action="edit" title="Edit step"><svg width="14" height="14" viewBox="0 0 640 640" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M100.4 417.2C104.5 402.6 112.2 389.3 123 378.5L304.2 197.3L338.1 163.4C354.7 180 389.4 214.7 442.1 267.4L476 301.3L442.1 335.2L260.9 516.4C250.2 527.1 236.8 534.9 222.2 539L94.4 574.6C86.1 576.9 77.1 574.6 71 568.4C64.9 562.2 62.6 553.3 64.9 545L100.4 417.2zM156 413.5C151.6 418.2 148.4 423.9 146.7 430.1L122.6 517L209.5 492.9C215.9 491.1 221.7 487.8 226.5 483.2L155.9 413.5zM510 267.4C493.4 250.8 458.7 216.1 406 163.4L372 129.5C398.5 103 413.4 88.1 416.9 84.6C430.4 71 448.8 63.4 468 63.4C487.2 63.4 505.6 71 519.1 84.6L554.8 120.3C568.4 133.9 576 152.3 576 171.4C576 190.5 568.4 209 554.8 222.5C551.3 226 536.4 240.9 509.9 267.4z"/></svg></button>
-                              <button class="btn btn-danger btn-sm" data-action="delete" title="Delete step"><svg width="14" height="14" viewBox="0 0 448 512" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M136.7 5.9C141.1-7.2 153.3-16 167.1-16l113.9 0c13.8 0 26 8.8 30.4 21.9L320 32 416 32c17.7 0 32 14.3 32 32s-14.3 32-32 32L32 96C14.3 96 0 81.7 0 64S14.3 32 32 32l96 0 8.7-26.1zM32 144l384 0 0 304c0 35.3-28.7 64-64 64L96 512c-35.3 0-64-28.7-64-64l0-304zm88 64c-13.3 0-24 10.7-24 24l0 192c0 13.3 10.7 24 24 24s24-10.7 24-24l0-192c0-13.3-10.7-24-24-24zm104 0c-13.3 0-24 10.7-24 24l0 192c0 13.3 10.7 24 24 24s24-10.7 24-24l0-192c0-13.3-10.7-24-24-24zm104 0c-13.3 0-24 10.7-24 24l0 192c0 13.3 10.7 24 24 24s24-10.7 24-24l0-192c0-13.3-10.7-24-24-24z"/></svg></button>
-                          </div>
-                      `);
+        // Title
+        const titleEl = document.createElement('div');
+        titleEl.className = 'title';
+        titleEl.textContent = step.title || step.id || '(untitled)';
 
-        card
-          .querySelector('[data-action="edit"]')
-          .addEventListener('click', () => openStepEditor(step.id));
-        card.querySelector('[data-action="delete"]').addEventListener('click', () => {
+        // Meta information
+        const metaEl = document.createElement('div');
+        metaEl.className = 'meta';
+        const typeLabel = translator.instant('type:');
+        metaEl.textContent = `${typeLabel} ${typeDisplay}${step.next ? ` → ${step.next}` : ''}`;
+
+        // Action buttons container
+        const actionsEl = document.createElement('div');
+        actionsEl.className = 'actions';
+
+        const editBtn = document.createElement('button');
+        editBtn.className = 'btn btn-secondary btn-sm';
+        editBtn.dataset.action = 'edit';
+        editBtn.title = translator.instant('Edit step');
+        editBtn.innerHTML = translator.replaceHTML('<svg width="14" height="14" viewBox="0 0 640 640" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M100.4 417.2C104.5 402.6 112.2 389.3 123 378.5L304.2 197.3L338.1 163.4C354.7 180 389.4 214.7 442.1 267.4L476 301.3L442.1 335.2L260.9 516.4C250.2 527.1 236.8 534.9 222.2 539L94.4 574.6C86.1 576.9 77.1 574.6 71 568.4C64.9 562.2 62.6 553.3 64.9 545L100.4 417.2zM156 413.5C151.6 418.2 148.4 423.9 146.7 430.1L122.6 517L209.5 492.9C215.9 491.1 221.7 487.8 226.5 483.2L155.9 413.5zM510 267.4C493.4 250.8 458.7 216.1 406 163.4L372 129.5C398.5 103 413.4 88.1 416.9 84.6C430.4 71 448.8 63.4 468 63.4C487.2 63.4 505.6 71 519.1 84.6L554.8 120.3C568.4 133.9 576 152.3 576 171.4C576 190.5 568.4 209 554.8 222.5C551.3 226 536.4 240.9 509.9 267.4z"/></svg>');
+
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'btn btn-danger btn-sm';
+        deleteBtn.dataset.action = 'delete';
+        deleteBtn.title = translator.instant('Delete step');
+        deleteBtn.innerHTML = translator.replaceHTML('<svg width="14" height="14" viewBox="0 0 448 512" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M136.7 5.9C141.1-7.2 153.3-16 167.1-16l113.9 0c13.8 0 26 8.8 30.4 21.9L320 32 416 32c17.7 0 32 14.3 32 32s-14.3 32-32 32L32 96C14.3 96 0 81.7 0 64S14.3 32 32 32l96 0 8.7-26.1zM32 144l384 0 0 304c0 35.3-28.7 64-64 64L96 512c-35.3 0-64-28.7-64-64l0-304zm88 64c-13.3 0-24 10.7-24 24l0 192c0 13.3 10.7 24 24 24s24-10.7 24-24l0-192c0-13.3-10.7-24-24-24zm104 0c-13.3 0-24 10.7-24 24l0 192c0 13.3 10.7 24 24 24s24-10.7 24-24l0-192c0-13.3-10.7-24-24-24zm104 0c-13.3 0-24 10.7-24 24l0 192c0 13.3 10.7 24 24 24s24-10.7 24-24l0-192c0-13.3-10.7-24-24-24z"/></svg>');
+
+        actionsEl.appendChild(editBtn);
+        actionsEl.appendChild(deleteBtn);
+
+        card.appendChild(titleEl);
+        card.appendChild(metaEl);
+        card.appendChild(actionsEl);
+
+        editBtn.addEventListener('click', () => openStepEditor(step.id));
+        deleteBtn.addEventListener('click', () => {
           if (confirm(`${translator.instant('Delete step')} "${step.title || step.id}"?`)) {
             chain.steps = chain.steps.filter((s) => s.id !== step.id);
             // Remove references to this step
