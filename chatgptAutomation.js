@@ -3171,6 +3171,12 @@ for (const lang in extraTranslations) {
             ${translator.instant('Controls default visibility on page load. You can still toggle from the header button.')}
           </div>
         </div>
+        <div class="form-group">
+          <label>Support:</label>
+          <div class="help-text">
+            <a href="https://www.paypal.com/paypalme/my/profile" target="_blank" rel="noopener noreferrer">Donate via PayPal</a>
+          </div>
+        </div>
       </div>
     </div>
 
