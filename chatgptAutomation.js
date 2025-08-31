@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ChatGPT Automation Pro
 // @namespace    http://tampermonkey.net/
-// @version      2.6
+// @version      2.8
 // @description  Advanced ChatGPT automation with dynamic templating
 // @author       Henry Russell
 // @match        https://chatgpt.com/*
