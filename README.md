@@ -19,6 +19,8 @@ Automate ChatGPT in your browser. Type → send → wait → run your code. Batc
 
 ---
 
+New! Firefox addon:
+https://addons.mozilla.org/en-US/firefox/addon/chatgpt-automation-pro/
 
 1) Install Tampermonkey
 2) Open the raw script URL and accept install:
