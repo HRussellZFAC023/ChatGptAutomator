@@ -2564,44 +2564,33 @@ for (const lang in extraTranslations) {
           );
         }
 
-        // Use sandbox-safe Function constructor; await Promise if returned
-        const Fn = function () {}.constructor; // constructor of a sandboxed function
-        const fn = new Fn(
-          'response',
-          'log',
-          'console',
-          'item',
-          'index',
-          'total',
-          'http',
-          'steps',
-          'lastResponse',
-          'GM_getValue',
-          'GM_setValue',
-          'GM_xmlhttpRequest',
-          'unsafeWindow',
-          'utils',
-          code
-        );
-        const result = fn(
-          responseText,
-          (msg, type = 'info') => utils.log(msg, type),
-          console,
-          item,
-          index,
-          total,
-          http,
-          stepsCtx,
-          lastResponse,
-          GM_getValue,
-          GM_setValue,
-          GM_xmlhttpRequest,
-          unsafeWindow,
-          utils
-        );
-        await Promise.resolve(result);
-        utils.log('Custom code executed successfully');
-        return result;
+        // Execute user code via dynamic import to satisfy Chrome's CSP (avoids unsafe-eval)
+        const wrapped = `export default async (response, log, console, item, index, total, http, steps, lastResponse, GM_getValue, GM_setValue, GM_xmlhttpRequest, unsafeWindow, utils) => {\n${code}\n}`;
+        const blob = new Blob([wrapped], { type: 'text/javascript' });
+        const url = URL.createObjectURL(blob);
+        try {
+          const module = await import(url);
+          const result = await module.default(
+            responseText,
+            (msg, type = 'info') => utils.log(msg, type),
+            console,
+            item,
+            index,
+            total,
+            http,
+            stepsCtx,
+            lastResponse,
+            GM_getValue,
+            GM_setValue,
+            GM_xmlhttpRequest,
+            unsafeWindow,
+            utils
+          );
+          utils.log('Custom code executed successfully');
+          return result;
+        } finally {
+          URL.revokeObjectURL(url);
+        }
       } catch (error) {
         utils.log(`Custom code execution error: ${error.message}`, 'error');
         throw error;
