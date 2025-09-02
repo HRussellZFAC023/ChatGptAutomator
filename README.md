@@ -71,5 +71,5 @@ Example: API → JS → Prompt
 
 ## Contribute
 
-Issues and PRs welcome. If this saves you time, **⭐️ star the repo** — it helps others find it.
+Issues and PRs welcome. If this saves you time, **⭐️ star the repo** — it helps others find it!
 
